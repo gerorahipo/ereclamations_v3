@@ -1,0 +1,23 @@
+# ── Node ─────────────────────────────
+node_modules/
+frontend/dist/
+frontend/.env.local
+
+# ── PHP / Backend ─────────────────────
+backend/.env
+backend/vendor/
+
+# ── Docker ────────────────────────────
+.env
+
+# ── IDE ───────────────────────────────
+.vscode/
+.idea/
+*.swp
+
+# ── OS ────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Logs ─────────────────────────────
+*.log
