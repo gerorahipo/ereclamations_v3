@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  web.config pour le frontend React/Vite (dossier dist/)
+  À placer dans : frontend/dist/web.config
+
+  Prérequis IIS :
+    - URL Rewrite Module  : https://www.iis.net/downloads/microsoft/url-rewrite
+    - Application Request Routing (ARR) : https://www.iis.net/downloads/microsoft/application-request-routing
+    - Activer le proxy dans IIS Manager > ARR > Server Proxy Settings > Enable proxy
+
+  Le backend PHP doit tourner sur le port 8080 (site IIS séparé)
+-->
+<configuration>
+  <system.webServer>
+    <rewrite>
+      <rules>
+        <!-- 1. Proxy /api/* vers le backend PHP -->
+        <rule name="API Reverse Proxy" stopProcessing="true">
+          <match url="^api/(.*)" />
+          <action type="Rewrite" url="http://localhost:8080/api/{R:1}" />
+        </rule>
+        <!-- 2. SPA Fallback : toutes les routes React → index.html -->
+        <rule name="SPA React Router" stopProcessing="true">
+          <match url=".*" />
+          <conditions logicalGrouping="MatchAll">
+            <add input="{REQUEST_FILENAME}" matchType="IsFile" negate="true" />
+            <add input="{REQUEST_FILENAME}" matchType="IsDirectory" negate="true" />
+          </conditions>
+          <action type="Rewrite" url="/index.html" />
+        </rule>
+      </rules>
+    </rewrite>
+
+    <!-- Types MIME pour PWA et polices -->
+    <staticContent>
+      <remove fileExtension=".webmanifest" />
+      <mimeMap fileExtension=".webmanifest" mimeType="application/manifest+json" />
+      <remove fileExtension=".woff2" />
+      <mimeMap fileExtension=".woff2" mimeType="font/woff2" />
+    </staticContent>
+
+    <!-- Désactiver la navigation dans les dossiers -->
+    <directoryBrowse enabled="false" />
+  </system.webServer>
+</configuration>
