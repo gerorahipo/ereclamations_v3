@@ -1,15 +1,17 @@
 # ============================================================
 # Script de déploiement - eRéclamations CNPS CI
 # Windows Server natif (sans Docker)
+# PHP 8.4 | Frontend port 8080 | Backend PHP port 9000 (interne)
 # ============================================================
 # Usage: .\deploy.ps1
-# Prérequis : PHP 8.3, Node.js 20, PostgreSQL 15, IIS installés
+# Prérequis : PHP 8.4, Node.js 20, PostgreSQL 15, IIS installés
 # ============================================================
 
 param(
-    [string]$ProjectPath = "C:\inetpub\ereclamations",
-    [string]$FrontendPort = "80",
-    [string]$BackendPort  = "8080"
+    [string]$ProjectPath   = "C:\inetpub\ereclamations",
+    [string]$FrontendPort  = "8080",   # Port visible depuis le réseau
+    [string]$BackendPort   = "9000",   # Port interne PHP API (localhost uniquement)
+    [string]$PhpPath       = "C:\PHP84"
 )
 
 Write-Host "=== Déploiement eRéclamations CNPS ===" -ForegroundColor Cyan
@@ -20,8 +22,13 @@ Write-Host "`n[1/6] Vérification des prérequis..." -ForegroundColor Green
 
 $errors = @()
 
-if (-not (Test-Path "C:\PHP83\php.exe")) {
-    $errors += "PHP 8.3 non trouvé dans C:\PHP83\"
+if (-not (Test-Path "$PhpPath\php.exe")) {
+    # Chercher aussi dans C:\PHP83 pour compatibilité ascendante
+    if (Test-Path "C:\PHP83\php.exe") {
+        $PhpPath = "C:\PHP83"
+    } else {
+        $errors += "PHP non trouvé dans $PhpPath (ni dans C:\PHP83\)"
+    }
 }
 if (-not (Get-Command "node" -ErrorAction SilentlyContinue)) {
     $errors += "Node.js non installé"
@@ -40,7 +47,7 @@ if ($errors.Count -gt 0) {
     exit 1
 }
 
-Write-Host "  ✅ PHP 8.3 OK" -ForegroundColor Green
+Write-Host "  ✅ PHP OK ($($PhpPath) - $(& "$PhpPath\php.exe" --version | Select-String 'PHP \d+\.\d+\.\d+'))" -ForegroundColor Green
 Write-Host "  ✅ Node.js OK ($(node --version))" -ForegroundColor Green
 Write-Host "  ✅ PostgreSQL 15 OK" -ForegroundColor Green
 
@@ -94,19 +101,22 @@ if (-not $urlRewrite) {
     Write-Host "     Télécharger : https://www.iis.net/downloads/microsoft/url-rewrite" -ForegroundColor Yellow
 }
 
-# Site Backend API
+# Site Backend API (interne - pas accessible depuis l'extérieur)
 if (-not (Get-Website -Name "ereclamations-api" -ErrorAction SilentlyContinue)) {
     New-Website -Name "ereclamations-api" `
                 -PhysicalPath "$ProjectPath\backend\public" `
                 -Port $BackendPort `
                 -Force
-    Write-Host "  ✅ Site IIS 'ereclamations-api' créé (port $BackendPort)" -ForegroundColor Green
+    # Lier uniquement à localhost (sécurité : pas accessible depuis le réseau)
+    Set-WebBinding -Name "ereclamations-api" -BindingInformation "*:${BackendPort}:" `
+                   -PropertyName "bindingInformation" -Value "127.0.0.1:${BackendPort}:"
+    Write-Host "  ✅ Site IIS 'ereclamations-api' créé (port $BackendPort - localhost uniquement)" -ForegroundColor Green
 } else {
     Set-ItemProperty "IIS:\Sites\ereclamations-api" -Name physicalPath -Value "$ProjectPath\backend\public"
     Write-Host "  ✅ Site IIS 'ereclamations-api' mis à jour" -ForegroundColor Green
 }
 
-# Site Frontend
+# Site Frontend (accessible depuis le réseau sur port 8080)
 if (-not (Get-Website -Name "ereclamations" -ErrorAction SilentlyContinue)) {
     New-Website -Name "ereclamations" `
                 -PhysicalPath "$ProjectPath\frontend\dist" `
@@ -145,6 +155,7 @@ try {
 }
 
 Write-Host "`n=== Déploiement terminé ===" -ForegroundColor Cyan
-Write-Host "Frontend : http://localhost:$FrontendPort" -ForegroundColor White
-Write-Host "API      : http://localhost:$BackendPort/api/" -ForegroundColor White
-Write-Host "`n⚠️  N'oubliez pas de configurer SSL/HTTPS pour la production !" -ForegroundColor Yellow
+Write-Host "Frontend : http://NOM_DU_SERVEUR:$FrontendPort" -ForegroundColor White
+Write-Host "API      : http://localhost:$BackendPort/api/ (interne uniquement)" -ForegroundColor White
+Write-Host "`n⚠️  N'oubliez pas d'ouvrir le port $FrontendPort dans le pare-feu Windows !" -ForegroundColor Yellow
+Write-Host "   Commande : netsh advfirewall firewall add rule name='eReclamations' dir=in action=allow protocol=TCP localport=$FrontendPort" -ForegroundColor Gray

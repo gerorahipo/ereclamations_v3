@@ -3,21 +3,23 @@
   web.config pour le frontend React/Vite (dossier dist/)
   À placer dans : frontend/dist/web.config
 
+  Architecture des ports :
+    - Port 8080 : Frontend (ce site IIS, accessible depuis le réseau)
+    - Port 9000 : Backend PHP API (site IIS interne uniquement, localhost)
+
   Prérequis IIS :
     - URL Rewrite Module  : https://www.iis.net/downloads/microsoft/url-rewrite
     - Application Request Routing (ARR) : https://www.iis.net/downloads/microsoft/application-request-routing
     - Activer le proxy dans IIS Manager > ARR > Server Proxy Settings > Enable proxy
-
-  Le backend PHP doit tourner sur le port 8080 (site IIS séparé)
 -->
 <configuration>
   <system.webServer>
     <rewrite>
       <rules>
-        <!-- 1. Proxy /api/* vers le backend PHP -->
+        <!-- 1. Proxy /api/* vers le backend PHP (port 9000 interne) -->
         <rule name="API Reverse Proxy" stopProcessing="true">
           <match url="^api/(.*)" />
-          <action type="Rewrite" url="http://localhost:8080/api/{R:1}" />
+          <action type="Rewrite" url="http://localhost:9000/api/{R:1}" />
         </rule>
         <!-- 2. SPA Fallback : toutes les routes React → index.html -->
         <rule name="SPA React Router" stopProcessing="true">
