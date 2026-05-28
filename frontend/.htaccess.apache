@@ -1,0 +1,22 @@
+# ============================================================
+# .htaccess — Frontend React SPA (Apache/XAMPP)
+# À placer dans frontend/dist/ après le build
+#
+# Prérequis Apache : mod_rewrite, mod_proxy, mod_proxy_http
+# ============================================================
+
+Options -Indexes
+
+RewriteEngine On
+
+# ── 1. Proxy /api/* vers le backend PHP (port 9000 interne) ──
+# mod_proxy et mod_proxy_http doivent être activés dans httpd.conf
+RewriteRule ^api/(.*)$ http://127.0.0.1:9000/api/$1 [P,L]
+
+# ── 2. Servir les fichiers statiques réels directement ────────
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# ── 3. SPA Fallback : toutes les routes React → index.html ───
+RewriteRule ^ /index.html [L]

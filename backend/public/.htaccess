@@ -1,0 +1,25 @@
+# ============================================================
+# .htaccess — Backend PHP (Front Controller)
+# Toutes les requêtes → index.php
+# ============================================================
+
+Options -Indexes
+Options -MultiViews
+
+# Activer le module de réécriture
+RewriteEngine On
+
+# Bloquer l'accès aux fichiers sensibles
+RewriteRule ^\.env$ - [F,L]
+RewriteRule ^src/ - [F,L]
+RewriteRule ^database/ - [F,L]
+RewriteRule ^scripts/ - [F,L]
+
+# Si le fichier existe réellement (ex: migrate.php), le servir directement
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+
+# Sinon, tout rediriger vers index.php (routeur principal)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [QSA,L]
