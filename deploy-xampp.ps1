@@ -32,9 +32,9 @@ if (-not (Test-Path "$XamppPath\php\php.exe")) {
 if (-not (Get-Command "node" -ErrorAction SilentlyContinue)) {
     $errors += "Node.js non installé"
 }
-$psql = "C:\Program Files\PostgreSQL\15\bin\psql.exe"
+$psql = "C:\Program Files\PostgreSQL\16\bin\psql.exe"
 if (-not (Test-Path $psql)) {
-    $errors += "PostgreSQL 15 non trouvé"
+    $errors += "PostgreSQL 16 non trouvé"
 }
 
 if ($errors.Count -gt 0) {
