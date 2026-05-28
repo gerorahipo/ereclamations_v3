@@ -1,6 +1,6 @@
 # ============================================================
 # Script de déploiement XAMPP — eRéclamations CNPS CI
-# Windows Server | XAMPP (Apache + PHP 8.4) | PostgreSQL 15
+# Windows Server | XAMPP (Apache + PHP 8.2) | PostgreSQL 15
 # ============================================================
 # Usage : .\deploy-xampp.ps1
 # Prérequis : XAMPP installé, PostgreSQL 15, Node.js 20
