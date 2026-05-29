@@ -64,12 +64,12 @@ INSERT INTO processus (code, libelle) VALUES
     ('ATMP',    'Accidents du Travail et Maternité');
 
 -- ─── MOTIFS ─────────────────────────────────────────────────
-INSERT INTO motifs (processus_id, categorie, objet) VALUES
-    (1, 'Immatriculation',      'Problème d''immatriculation'),
-    (1, 'Cotisations',          'Problème de cotisations'),
-    (2, 'Liquidation',          'Retard de liquidation retraite'),
-    (3, 'Allocations',          'Non réception des allocations'),
-    (4, 'Maternité',            'Dossier indemnités journalières');
+INSERT INTO motifs (regime_id, type_client_id, libelle) VALUES
+    (1, 1,    'Problème d''immatriculation'),
+    (1, 1,    'Problème de cotisations'),
+    (1, 3,    'Retard de liquidation retraite'),
+    (1, 2,    'Non réception des allocations'),
+    (1, 2,    'Dossier indemnités journalières');
 
 -- ─── SOUS-MOTIFS (Délai SLA spécifique) ─────────────────────
 INSERT INTO sous_motifs (motif_id, libelle, delai_traitement_jours) VALUES

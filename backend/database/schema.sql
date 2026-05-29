@@ -85,8 +85,7 @@ CREATE TABLE motifs (
     id              SERIAL PRIMARY KEY,
     regime_id       INTEGER      REFERENCES regimes(id) ON DELETE SET NULL,
     type_client_id  INTEGER      REFERENCES types_clients(id) ON DELETE SET NULL,
-    categorie       VARCHAR(150) NOT NULL,
-    objet           VARCHAR(300) NOT NULL,
+    libelle         VARCHAR(300) NOT NULL,
     actif           BOOLEAN      NOT NULL DEFAULT TRUE
 );
 
