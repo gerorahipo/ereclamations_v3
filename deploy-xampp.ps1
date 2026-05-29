@@ -1,15 +1,15 @@
 # ============================================================
 # Script de déploiement XAMPP — eRéclamations CNPS CI
-# Windows Server | XAMPP (Apache + PHP 8.2) | PostgreSQL 15
+# Windows Server | XAMPP (Apache + PHP 8.2) | PostgreSQL 16
 # ============================================================
 # Usage : .\deploy-xampp.ps1
-# Prérequis : XAMPP installé, PostgreSQL 15, Node.js 20
+# Prérequis : XAMPP installé, PostgreSQL 16, Node.js 20
 # ============================================================
 
 param(
     [string]$ProjectPath  = "C:\inetpub\ereclamations",
     [string]$XamppPath    = "C:\xampp",
-    [string]$FrontendPort = "8080",   # Port accessible depuis le réseau
+    [string]$FrontendPort = "81",     # Port accessible depuis le réseau
     [string]$BackendPort  = "9000"    # Port interne PHP (localhost uniquement)
 )
 
@@ -47,7 +47,7 @@ $phpVersion = & "$XamppPath\php\php.exe" -r "echo PHP_VERSION;"
 Write-Host "  ✅ Apache XAMPP OK" -ForegroundColor Green
 Write-Host "  ✅ PHP XAMPP OK (v$phpVersion)" -ForegroundColor Green
 Write-Host "  ✅ Node.js OK ($(node --version))" -ForegroundColor Green
-Write-Host "  ✅ PostgreSQL 15 OK" -ForegroundColor Green
+Write-Host "  ✅ PostgreSQL 16 OK" -ForegroundColor Green
 
 # Vérifier que pdo_pgsql est activé dans XAMPP
 $pdoCheck = & "$XamppPath\php\php.exe" -r "echo extension_loaded('pdo_pgsql') ? 'OK' : 'MANQUANT';"

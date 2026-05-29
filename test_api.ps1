@@ -1,7 +1,7 @@
 # test_api.ps1
 # Usage: powershell -ExecutionPolicy Bypass -File .\test_api.ps1
 
-$BASE = "http://localhost:8080/api"
+$BASE = "http://localhost:81/api"
 
 function Test-Endpoint {
     param($Method, $Path, $Body, $Token, $Description, $ExpectedStatus = 200)

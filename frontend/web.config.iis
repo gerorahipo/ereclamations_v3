@@ -4,7 +4,7 @@
   À placer dans : frontend/dist/web.config
 
   Architecture des ports :
-    - Port 8080 : Frontend (ce site IIS, accessible depuis le réseau)
+    - Port 81   : Frontend (ce site IIS, accessible depuis le réseau)
     - Port 9000 : Backend PHP API (site IIS interne uniquement, localhost)
 
   Prérequis IIS :
