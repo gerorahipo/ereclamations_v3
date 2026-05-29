@@ -1,5 +1,6 @@
 -- ============================================================
--- eReclamations CNPS CI — Données de test (seed) — Version 2.0
+-- eReclamations CNPS CI — Données de test et de paramétrage (seed) unifiées
+-- Version: 2.1 | Date: 2026-05-29
 -- ============================================================
 
 -- ─── AGENCES ────────────────────────────────────────────────
@@ -95,6 +96,81 @@ INSERT INTO affectations_pilotes (agence_id, processus_id, pilote_id) VALUES
 INSERT INTO partenaires (type, numero_cnps, nom, telephone, email) VALUES
     ('entreprise',  'ENT-123', 'SOCIÉTÉ INDUSTRIELLE', '0102030405', 'hr@sici.ci'),
     ('travailleur', 'TRV-789', 'DIALLO Mamadou',      '0708091011', NULL);
+
+-- ─── INSÉRER LES CATÉGORIES DE CAUSES PAR DÉFAUT ─────────────
+INSERT INTO categories_causes (processus_id, libelle)
+SELECT id, 'Cause Client' FROM processus;
+
+INSERT INTO categories_causes (processus_id, libelle)
+SELECT id, 'Cause CNPS' FROM processus;
+
+-- ─── INJECTION DES CAUSES (ATMP & GDAV) ──────────────────────
+DO $$
+DECLARE
+    proc_id_atmp INTEGER;
+    proc_id_av INTEGER;
+    cat_client_id INTEGER;
+    cat_cnps_id INTEGER;
+BEGIN
+    -- Causes ATMP
+    SELECT id INTO proc_id_atmp FROM processus WHERE code = 'ATMP';
+    IF proc_id_atmp IS NOT NULL THEN
+        -- Catégorie Client
+        SELECT id INTO cat_client_id FROM categories_causes WHERE processus_id = proc_id_atmp AND libelle = 'Cause Client';
+        INSERT INTO causes (categorie_id, libelle) VALUES 
+        (cat_client_id, 'Non dépôt de pièces de maintien de droit'),
+        (cat_client_id, 'Assuré injoignable'),
+        (cat_client_id, 'Dossier incomplet malgré les DRP');
+
+        -- Catégorie CNPS
+        SELECT id INTO cat_cnps_id FROM categories_causes WHERE processus_id = proc_id_atmp AND libelle = 'Cause CNPS';
+        INSERT INTO causes (categorie_id, libelle) VALUES 
+        (cat_cnps_id, 'Défaut de communication'),
+        (cat_cnps_id, 'Méconnaissance du mode de calcul des IJ AT/MP'),
+        (cat_cnps_id, 'Erreur de rattachement du certificat de vie CV'),
+        (cat_cnps_id, 'Omission de la saisie du certificat de vie CV'),
+        (cat_cnps_id, 'Dossier complet non traité (saisie et validation)'),
+        (cat_cnps_id, 'Dossier réceptionné non conforme'),
+        (cat_cnps_id, 'Dossier de base introuvable'),
+        (cat_cnps_id, 'DRP non réalisée'),
+        (cat_cnps_id, 'Dossier ou pièce saisi(e) et non validé(e)'),
+        (cat_cnps_id, 'Dossier en instance au contrôle médical (expertise révision)'),
+        (cat_cnps_id, 'Dossier en instance de contrôle');
+    END IF;
+
+    -- Causes GDAV
+    SELECT id INTO proc_id_av FROM processus WHERE code = 'GDAV';
+    IF proc_id_av IS NOT NULL THEN
+        -- Catégorie Client
+        SELECT id INTO cat_client_id FROM categories_causes WHERE processus_id = proc_id_av AND libelle = 'Cause Client';
+        INSERT INTO causes (categorie_id, libelle) VALUES 
+        (cat_client_id, 'Non dépôt du certificat de vie CV'),
+        (cat_client_id, 'Non dépôt du certificat de vie et entretien CVE dans la période requise'),
+        (cat_client_id, 'Non dépôt de l''attestation de fréquentation'),
+        (cat_client_id, 'Assuré injoignable'),
+        (cat_client_id, 'Dossier incomplet malgré information assuré'),
+        (cat_client_id, 'Non dépôt du RIB');
+
+        -- Catégorie CNPS
+        SELECT id INTO cat_cnps_id FROM categories_causes WHERE processus_id = proc_id_av AND libelle = 'Cause CNPS';
+        INSERT INTO causes (categorie_id, libelle) VALUES 
+        (cat_cnps_id, 'Défaut de communication'),
+        (cat_cnps_id, 'Méconnaissance du mode de calcul des droits'),
+        (cat_cnps_id, 'Erreur de rattachement d''enfant'),
+        (cat_cnps_id, 'Erreur de rattachement du certificat de vie CV'),
+        (cat_cnps_id, 'Omission de la saisie du certificat de vie CV'),
+        (cat_cnps_id, 'Omission de la saisie du certificat de vie et entretien CVE'),
+        (cat_cnps_id, 'Non levée de suspension après dépôt des pièces de mise à jour'),
+        (cat_cnps_id, 'Dossier complet non traité'),
+        (cat_cnps_id, 'Dossier de base introuvable'),
+        (cat_cnps_id, 'Dossier en instance à la carrière');
+    END IF;
+END $$;
+
+-- ─── BASE DE CONNAISSANCES / SUGGESTIONS ─────────────────────
+INSERT INTO suggestions_reponses (titre, contenu) VALUES 
+('Remerciements standard', 'Nous vous remercions pour votre message. Nous avons bien pris en compte votre réclamation et nos services travaillent à sa résolution dans les plus brefs délais.'),
+('Clôture positive', 'Après analyse de votre dossier, nous avons procédé à la régularisation de votre situation. Votre paiement sera effectif sous 48h.');
 
 -- ─── RÉCLAMATIONS DE TEST ────────────────────────────────────
 -- On insère sans spécifier le numero_ticket et date_echeance_sla (gérés par trigger)

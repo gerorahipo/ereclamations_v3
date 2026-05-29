@@ -1,6 +1,6 @@
 -- ============================================================
--- eReclamations CNPS CI — Schéma PostgreSQL
--- Version: 1.0 | Date: 2026-04-24
+-- eReclamations CNPS CI — Schéma PostgreSQL Unifié (Consolidé)
+-- Version: 2.0 | Date: 2026-05-29
 -- ============================================================
 
 -- Extensions
@@ -46,9 +46,8 @@ CREATE TABLE utilisateurs (
 );
 
 -- ============================================================
--- 4. PARAMÉTRAGE MÉTIER (Nouveau)
+-- 4. PARAMÉTRAGE MÉTIER (Régimes, Clients, Saisines)
 -- ============================================================
-
 CREATE TABLE regimes (
     id      SERIAL PRIMARY KEY,
     libelle VARCHAR(100) NOT NULL UNIQUE,
@@ -98,7 +97,54 @@ CREATE TABLE sous_motifs (
 );
 
 -- ============================================================
--- 7. IMPUTATION AUTOMATIQUE
+-- 7. CAUSES ET CATÉGORIES DE CAUSES
+-- ============================================================
+CREATE TABLE categories_causes (
+    id           SERIAL PRIMARY KEY,
+    processus_id INTEGER REFERENCES processus(id) ON DELETE CASCADE,
+    libelle      VARCHAR(100) NOT NULL,
+    created_at   TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE causes (
+    id           SERIAL PRIMARY KEY,
+    categorie_id INTEGER REFERENCES categories_causes(id) ON DELETE CASCADE,
+    libelle      TEXT NOT NULL,
+    actif        BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at   TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+-- ============================================================
+-- 8. BASE DE CONNAISSANCES ET SUGGESTIONS DE RÉPONSES
+-- ============================================================
+CREATE TABLE suggestions_reponses (
+    id          SERIAL PRIMARY KEY,
+    motif_id    INTEGER REFERENCES motifs(id) ON DELETE SET NULL,
+    cause_id    INTEGER REFERENCES causes(id) ON DELETE SET NULL,
+    titre       VARCHAR(255) NOT NULL,
+    contenu     TEXT NOT NULL,
+    actif       BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at  TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE kb_entries (
+    id              SERIAL PRIMARY KEY,
+    sous_motif_id   INTEGER NOT NULL REFERENCES sous_motifs(id) ON DELETE CASCADE,
+    titre           VARCHAR(255) NOT NULL,
+    analyse_type    TEXT NOT NULL,
+    actions_types   JSONB DEFAULT '[]'::jsonb,
+    actif           BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_kb_sous_motif ON kb_entries(sous_motif_id);
+CREATE INDEX idx_suggestions_motif ON suggestions_reponses(motif_id);
+CREATE INDEX idx_suggestions_cause ON suggestions_reponses(cause_id);
+
+-- ============================================================
+-- 9. IMPUTATION AUTOMATIQUE
 -- ============================================================
 CREATE TABLE affectations_pilotes (
     id           SERIAL PRIMARY KEY,
@@ -109,7 +155,7 @@ CREATE TABLE affectations_pilotes (
 );
 
 -- ============================================================
--- 8. PARTENAIRES SOCIAUX (Entreprises & Travailleurs)
+-- 10. PARTENAIRES SOCIAUX
 -- ============================================================
 CREATE TABLE partenaires (
     id            SERIAL PRIMARY KEY,
@@ -152,7 +198,7 @@ CREATE TABLE sinistres (
 );
 
 -- ============================================================
--- 9. RÉCLAMATIONS (Mise à jour)
+-- 11. RÉCLAMATIONS
 -- ============================================================
 CREATE TABLE reclamations (
     id                SERIAL PRIMARY KEY,
@@ -169,13 +215,21 @@ CREATE TABLE reclamations (
     partenaire_employeur VARCHAR(300),
     partenaire_employeur_numero_cnps VARCHAR(50),
     date_reception    DATE,
-    -- Nouveaux champs de paramétrage
+    
+    -- Paramétrage
     regime_id         INTEGER      NOT NULL REFERENCES regimes(id),
     type_client_id    INTEGER      NOT NULL REFERENCES types_clients(id),
     mode_saisine_id   INTEGER      NOT NULL REFERENCES modes_saisine(id),
     processus_id      INTEGER      NOT NULL REFERENCES processus(id),
     motif_id          INTEGER      NOT NULL REFERENCES motifs(id),
     sous_motif_id     INTEGER      NOT NULL REFERENCES sous_motifs(id),
+    
+    -- Causes (intégrées)
+    categorie_cause_id INTEGER     REFERENCES categories_causes(id) ON DELETE SET NULL,
+    cause_id          INTEGER      REFERENCES causes(id) ON DELETE SET NULL,
+    
+    -- Escalade (intégrée)
+    pilote_escaladeur_id INTEGER   REFERENCES utilisateurs(id) ON DELETE SET NULL,
     
     description       TEXT,
     statut            VARCHAR(30)  NOT NULL DEFAULT 'nouveau'
@@ -190,7 +244,7 @@ CREATE TABLE reclamations (
     updated_at        TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
--- Index mis à jour
+-- Index
 CREATE INDEX idx_reclamations_statut       ON reclamations(statut);
 CREATE INDEX idx_reclamations_agence       ON reclamations(agence_id);
 CREATE INDEX idx_reclamations_pilote       ON reclamations(pilote_id);
@@ -202,7 +256,7 @@ CREATE INDEX idx_reclamations_processus    ON reclamations(processus_id);
 -- Séquence pour numéros de tickets
 CREATE SEQUENCE ticket_seq START 1;
 
--- Fonction génération numéro ticket MISE À JOUR : Calcul SLA via sous_motif
+-- Fonction génération numéro ticket : Calcul SLA via sous_motif
 CREATE OR REPLACE FUNCTION generate_ticket_number()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -230,8 +284,16 @@ CREATE TRIGGER trg_reclamations_updated_at
     BEFORE UPDATE ON reclamations
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+CREATE TRIGGER trg_suggestions_reponses_updated_at
+    BEFORE UPDATE ON suggestions_reponses
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER trg_kb_entries_updated_at
+    BEFORE UPDATE ON kb_entries
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
 -- ============================================================
--- 8. ACTIONS DE TRAITEMENT
+-- 12. ACTIONS DE TRAITEMENT
 -- ============================================================
 CREATE TABLE actions_traitement (
     id              SERIAL PRIMARY KEY,
@@ -249,20 +311,23 @@ CREATE TABLE actions_traitement (
 CREATE INDEX idx_actions_reclamation ON actions_traitement(reclamation_id);
 
 -- ============================================================
--- 9. HISTORIQUE (Timeline)
+-- 13. HISTORIQUE (Timeline)
 -- ============================================================
 CREATE TABLE historique (
     id              SERIAL PRIMARY KEY,
     reclamation_id  INTEGER      NOT NULL REFERENCES reclamations(id) ON DELETE CASCADE,
     acteur_id       INTEGER      REFERENCES utilisateurs(id) ON DELETE SET NULL,
-    acteur_nom      VARCHAR(250),  -- Dénormalisation
+    acteur_nom      VARCHAR(250),
     action_type     VARCHAR(50)  NOT NULL
                       CHECK (action_type IN (
                         'creation', 'affectation', 'prise_en_charge',
                         'soumission_validation', 'validation', 'retour_pilote',
-                        'resolution', 'commentaire', 'action_ajoutee'
+                        'resolution', 'commentaire', 'action_ajoutee',
+                        'admin_action', 'login_success', 'login_failed', 'password_change',
+                        'escalade'
                       )),
     commentaire     TEXT,
+    metadata        JSONB,
     date_action     TIMESTAMP    NOT NULL DEFAULT NOW()
 );
 
