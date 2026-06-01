@@ -385,11 +385,11 @@ foreach ($mod in $modules) {
     }
 }
 
-# Activer les VirtualHosts
-if ($httpdContent -like "*#Include conf/extra/httpd-vhosts.conf*") {
-    $httpdContent  = $httpdContent -replace "#Include conf/extra/httpd-vhosts.conf", "Include conf/extra/httpd-vhosts.conf"
+# Desactiver le fichier d'exemples de VirtualHosts par defaut d'Apache (qui contient dummy-host2.example.com et provoque des erreurs)
+if ($httpdContent -match "(?m)^Include\s+conf/extra/httpd-vhosts\.conf") {
+    $httpdContent = $httpdContent -replace "(?m)^Include\s+conf/extra/httpd-vhosts\.conf", "#Include conf/extra/httpd-vhosts.conf"
     $httpdModified = $true
-    Write-OK "VirtualHosts actives dans httpd.conf"
+    Write-OK "VirtualHosts d'exemples par defaut (httpd-vhosts.conf) desactives pour eviter les erreurs dummy-host"
 }
 
 # Inclure notre fichier de config eReclamations
