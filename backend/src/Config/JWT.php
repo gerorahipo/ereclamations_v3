@@ -60,16 +60,13 @@ class JWT
     }
 
     // ─── Extrait le token du header Authorization ───────────
+    // Note: le token via GET (?token=...) a été supprimé pour la sécurité prod.
+    // Les tokens dans les URLs apparaissent dans les logs serveur et l'historique navigateur.
     public static function fromRequest(): ?string
     {
         $authHeader = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
         if (str_starts_with($authHeader, 'Bearer ')) {
             return substr($authHeader, 7);
-        }
-
-        // Support du token via paramètre d'URL (utile pour les téléchargements de fichiers)
-        if (!empty($_GET['token'])) {
-            return $_GET['token'];
         }
 
         return null;

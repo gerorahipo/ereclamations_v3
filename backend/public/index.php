@@ -34,7 +34,7 @@ spl_autoload_register(function (string $class): void {
 });
 
 // ─── Sécurité & CORS ────────────────────────────────────────
-$allowedOrigin = getenv('CORS_ORIGIN') ?: 'http://localhost:5173';
+$allowedOrigin = getenv('CORS_ORIGIN') ?: 'http://localhost:81';
 header("Access-Control-Allow-Origin: {$allowedOrigin}");
 header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Active-Agency");
@@ -103,15 +103,19 @@ try {
     }
 
     // ─── Administration (Paramétrage) ──────────────────────────
+    // Auth::require() ajouté en défense en profondeur (audit sécurité prod)
     if ($segments[0] === 'travailleurs' && $method === 'GET') {
+        App\Middleware\Auth::require();
         (new App\Controllers\ParametrageController())->travailleurs();
         return;
     }
     if ($segments[0] === 'employeurs' && $method === 'GET') {
+        App\Middleware\Auth::require();
         (new App\Controllers\ParametrageController())->employeurs();
         return;
     }
     if ($segments[0] === 'sinistres' && $method === 'GET') {
+        App\Middleware\Auth::require();
         (new App\Controllers\ParametrageController())->sinistres();
         return;
     }

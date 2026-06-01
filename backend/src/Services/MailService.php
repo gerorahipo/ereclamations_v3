@@ -80,7 +80,7 @@ class MailService
         $ticketNum = htmlspecialchars($reclamation['numero_ticket'], ENT_QUOTES, 'UTF-8');
         $objet = htmlspecialchars($reclamation['objet'], ENT_QUOTES, 'UTF-8');
         $dateReception = htmlspecialchars($reclamation['date_reception'], ENT_QUOTES, 'UTF-8');
-        $appUrl = htmlspecialchars($_ENV['CORS_ORIGIN'] ?? 'http://localhost:5173', ENT_QUOTES, 'UTF-8');
+        $appUrl = htmlspecialchars($_ENV['CORS_ORIGIN'] ?? 'http://localhost:81', ENT_QUOTES, 'UTF-8');
 
         $subject = "Nouvelle réclamation affectée : " . $reclamation['numero_ticket'];
         $body = "
@@ -104,7 +104,7 @@ class MailService
         $coordNom = htmlspecialchars($coordinator['prenoms'] . ' ' . $coordinator['nom'], ENT_QUOTES, 'UTF-8');
         $ticketNum = htmlspecialchars($reclamation['numero_ticket'], ENT_QUOTES, 'UTF-8');
         $piloteNom = htmlspecialchars($reclamation['pilote_nom'], ENT_QUOTES, 'UTF-8');
-        $appUrl = htmlspecialchars($_ENV['CORS_ORIGIN'] ?? 'http://localhost:5173', ENT_QUOTES, 'UTF-8');
+        $appUrl = htmlspecialchars($_ENV['CORS_ORIGIN'] ?? 'http://localhost:81', ENT_QUOTES, 'UTF-8');
 
         $subject = "Validation en attente : " . $reclamation['numero_ticket'];
         $body = "
@@ -143,7 +143,7 @@ class MailService
         $ticketNum = htmlspecialchars($reclamation['numero_ticket'], ENT_QUOTES, 'UTF-8');
         $agenceCibleNom = htmlspecialchars($reclamation['agence_cible_nom'], ENT_QUOTES, 'UTF-8');
         $piloteCibleNom = htmlspecialchars($reclamation['pilote_cible_nom'], ENT_QUOTES, 'UTF-8');
-        $appUrl = htmlspecialchars($_ENV['CORS_ORIGIN'] ?? 'http://localhost:5173', ENT_QUOTES, 'UTF-8');
+        $appUrl = htmlspecialchars($_ENV['CORS_ORIGIN'] ?? 'http://localhost:81', ENT_QUOTES, 'UTF-8');
 
         $subject = "Retour d'escalade : le ticket " . $reclamation['numero_ticket'] . " a été traité";
         $body = "

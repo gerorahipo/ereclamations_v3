@@ -181,3 +181,71 @@ APP_ENV=production
 ---
 
 > © 2026 CNPS Côte d'Ivoire — Usage strictement interne
+
+---
+
+## Déploiement sur Laragon (Windows, PHP 8.1)
+
+### Prérequis
+- [Laragon](https://laragon.org/) installé (version Full ou Lite)
+- PHP 8.1 sélectionné dans Laragon (clic droit > PHP > Switch > 8.1.x)
+- Extension `pdo_pgsql` activée dans `php.ini` de Laragon
+- PostgreSQL installé avec la base de données `ereclamations` déjà créée et le schéma importé
+- Node.js 20 LTS installé ([nodejs.org](https://nodejs.org/))
+
+### 1. Placer le projet dans Laragon
+
+Copier le dossier du projet dans `C:\laragon\www\ereclamations\`  
+*(ou adapter le paramètre `-ProjectPath` du script).*
+
+### 2. Importer la base de données (si pas encore fait)
+
+```powershell
+# Importer le schéma principal
+psql -h localhost -U postgres -d ereclamations -f backend\database\schema.sql
+
+# Importer les données de référence (causes, KB, etc.)
+psql -h localhost -U postgres -d ereclamations -f backend\database\seed.sql
+psql -h localhost -U postgres -d ereclamations -f backend\database\seed_causes.sql
+```
+
+### 3. Lancer le script de déploiement
+
+```powershell
+# Déploiement minimal (valeurs par défaut)
+powershell -ExecutionPolicy Bypass -File .\deploy-laragon.ps1
+
+# Déploiement avec paramètres personnalisés
+powershell -ExecutionPolicy Bypass -File .\deploy-laragon.ps1 `
+    -ProjectPath  "C:\laragon\www\ereclamations" `
+    -LaragonPath  "C:\laragon" `
+    -FrontendPort "81" `
+    -BackendPort  "9000" `
+    -PgHost       "localhost" `
+    -PgPort       "5432" `
+    -PgDb         "ereclamations" `
+    -PgUser       "postgres"
+```
+
+Le script effectue automatiquement :
+1. ✅ Vérifie Apache, PHP 8.1, l'extension `pdo_pgsql`, Node.js et `psql`
+2. ✅ Crée/met à jour le fichier `backend/.env`
+3. ✅ Build le frontend React/Vite (`npm install` + `npm run build`)
+4. ✅ Génère et installe les VirtualHosts Apache Laragon (ports 81 et 9000)
+5. ✅ Active les modules Apache nécessaires (`mod_rewrite`, `mod_proxy`, `mod_proxy_http`)
+6. ✅ Configure les permissions du dossier `storage`
+7. ✅ Ouvre le pare-feu Windows pour le port 81
+8. ✅ Redémarre Apache et teste l'API + le frontend
+
+### 4. Accéder à l'application
+
+Ouvrir : **http://localhost:81**
+
+### Architecture des ports Laragon
+
+| Port | Service | Accès |
+|------|---------|-------|
+| `81` | Frontend React (build Vite) | Réseau local + navigateur |
+| `9000` | Backend PHP API | Localhost uniquement (interne Apache) |
+| `5432` | PostgreSQL | Localhost uniquement |
+

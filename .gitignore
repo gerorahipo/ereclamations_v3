@@ -1,7 +1,9 @@
 # ── Node ─────────────────────────────
 node_modules/
 frontend/dist/
+frontend/.env
 frontend/.env.local
+frontend/.env.production
 
 # ── PHP / Backend ─────────────────────
 backend/.env

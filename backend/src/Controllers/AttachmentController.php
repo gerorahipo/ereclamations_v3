@@ -40,14 +40,13 @@ class AttachmentController
         $pdo = Database::getConnection();
         $user = Auth::$user;
 
-        // Scoping Check
-        /*
+        // Scoping Check — réactivé pour production
         if (!$this->checkAccess($pdo, $reclamationId, $user)) {
             http_response_code(403);
             echo json_encode(['error' => 'Accès non autorisé à cette réclamation']);
             return;
         }
-        */
+
 
         $stmt = $pdo->prepare("
             SELECT pj.*, CONCAT(r.prenoms, ' ', r.nom) AS cree_par_nom

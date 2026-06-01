@@ -123,30 +123,6 @@ export default function Login() {
               </button>
             </form>
 
-            {/* Comptes de démo */}
-            <div className="mt-8 pt-6 border-t border-slate-200">
-              <p className="text-xs text-slate-500 mb-3 font-semibold uppercase tracking-wider">Comptes de démonstration :</p>
-              <div className="space-y-2 text-xs text-slate-500">
-                {[
-                  { email: 'superviseur@cnps.ci',    role: 'Superviseur (Centrale)' },
-                  { email: 'coord.plateau@cnps.ci',  role: 'Manager de service' },
-                  { email: 'pilote.plateau@cnps.ci', role: 'Pilote' },
-                  { email: 'agent.plateau@cnps.ci',  role: 'Agent' },
-                ].map(({ email, role }) => (
-                  <button
-                    key={email}
-                    type="button"
-                    onClick={() => setForm({ email, password: 'Password@1234' })}
-                    className="flex items-center gap-2 w-full text-left hover:text-cnps-800 transition-colors"
-                  >
-                    <span className="w-1.5 h-1.5 bg-slate-300 rounded-full flex-shrink-0" />
-                    <span className="font-medium">{role}</span>
-                    <span className="text-slate-400">— {email}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
             <div className="mt-8 pt-6 border-t border-slate-200 text-center">
               <p className="text-xs text-slate-500">
                 Besoin d'assistance ? <a className="text-cnps-800 font-semibold hover:underline" href="#">Contacter le support IT</a>

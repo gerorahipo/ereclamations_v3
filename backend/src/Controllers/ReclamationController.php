@@ -378,8 +378,7 @@ class ReclamationController
             $isDigitalAgency = (stripos($userAgenceNom, 'digitale') !== false);
         }
 
-        /* 
-        // Commenté pour permettre la consultation de l'historique inter-agences
+        // Vérification scoping — réactivé pour production
         if (!$isDigitalAgency) {
             if ($user['role'] === 'agent') {
                 $stmtDigital = $pdo->prepare("SELECT id FROM agences WHERE nom ILIKE :nom LIMIT 1");
@@ -415,7 +414,7 @@ class ReclamationController
                 }
             }
         }
-        */
+
 
         // Actions de traitement
         $actStmt = $pdo->prepare("

@@ -1,0 +1,322 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Profil Superviseur</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            cnps: {
+              800: '#0f592f',
+              50: '#f0f7f3',
+              accent: '#c8963e'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+    body {
+      font-family: 'Outfit', sans-serif;
+      color: #334155;
+    }
+    .page-break {
+      page-break-before: always;
+    }
+    .avoid-break {
+      page-break-inside: avoid;
+    }
+    .callout {
+      border-left: 4px solid #0f592f;
+      background-color: #f8fafc;
+    }
+    .callout-warning {
+      border-left: 4px solid #c8963e;
+      background-color: #fffbeb;
+    }
+    .step-number {
+      background-color: #0f592f;
+      color: white;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th, td {
+      border-bottom: 1px solid #e2e8f0;
+      padding: 10px 12px;
+      text-align: left;
+    }
+    th {
+      background-color: #f1f5f9;
+      font-weight: 700;
+      color: #1e293b;
+    }
+  </style>
+</head>
+<body class="bg-white text-slate-700 antialiased leading-relaxed text-sm">
+
+  <!-- ─── PAGE DE COUVERTURE ────────────────────────────────────────── -->
+  <div class="h-[235mm] flex flex-col justify-between p-12 border-[12px] border-cnps-800 relative bg-slate-50/50">
+    <!-- Top Bar decoration -->
+    <div class="absolute top-0 left-0 right-0 h-3 bg-cnps-accent"></div>
+    
+    <!-- Logo CNPS -->
+    <div class="flex justify-between items-start">
+      <div>
+        <h3 class="text-xs font-black tracking-widest text-cnps-800 uppercase">Caisse Nationale de Prévoyance Sociale</h3>
+        <p class="text-[10px] text-slate-400 font-bold uppercase">République de Côte d'Ivoire</p>
+      </div>
+      <img src="data:image/png;base64,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" alt="Logo CNPS" class="h-16 object-contain" />
+    </div>
+
+    <!-- Main Title -->
+    <div class="my-auto space-y-6">
+      <div class="inline-block px-3.5 py-1 bg-cnps-800 text-white text-[9px] font-black uppercase tracking-widest rounded-lg shadow-sm">
+        Supervision Nationale
+      </div>
+      <div class="space-y-3">
+        <h1 class="text-3xl font-extrabold tracking-tight text-slate-900 leading-none">
+          GUIDE D'UTILISATION
+        </h1>
+        <h2 class="text-4xl font-black tracking-tight text-cnps-800 leading-none uppercase">
+          Profil Superviseur
+        </h2>
+        <div class="w-24 h-1.5 bg-cnps-accent rounded-full mt-3"></div>
+      </div>
+      <p class="text-base text-slate-500 font-medium max-w-xl">
+        Manuel d'administration centrale pour la supervision multi-agences, la gestion des escalades nationales, la configuration des SLA et des règles de routage.
+      </p>
+    </div>
+
+    <!-- Footer of Cover -->
+    <div class="border-t border-slate-200 pt-6 flex justify-between items-end">
+      <div class="space-y-1">
+        <p class="text-xs text-slate-400 font-bold uppercase tracking-wider">Application eRéclamations</p>
+        <p class="text-[10px] text-slate-500 font-medium">© 2026 CNPS Côte d'Ivoire. Tous droits réservés.</p>
+      </div>
+      <div class="text-right space-y-1">
+        <p class="text-xs text-slate-700 font-black">Version 1.0 (Production)</p>
+        <p class="text-[10px] text-slate-400 font-medium">Date d'édition : Mai 2026</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── CONTENU PRINCIPAL ────────────────────────────────────────── -->
+  <div class="p-16 space-y-8">
+    
+  <!-- SOMMAIRE -->
+  <div class="page-break avoid-break">
+    <h2 class="text-2xl font-black text-cnps-800 border-b-2 border-cnps-800 pb-2 mb-6 uppercase">Table des Matières</h2>
+    <ul class="space-y-4 font-semibold text-slate-700">
+      <li class="flex justify-between items-center border-b border-slate-100 pb-2">
+        <span class="flex items-center gap-3">
+          <span class="w-6 h-6 rounded-full bg-cnps-50 text-cnps-800 flex items-center justify-center text-xs font-black">1</span>
+          1. Introduction au Rôle de Superviseur Central
+        </span>
+        <span class="text-slate-400">Page 3</span>
+      </li>
+      <li class="flex justify-between items-center border-b border-slate-100 pb-2">
+        <span class="flex items-center gap-3">
+          <span class="w-6 h-6 rounded-full bg-cnps-50 text-cnps-800 flex items-center justify-center text-xs font-black">2</span>
+          2. Commutation Multi-Agences & Dashboard Central
+        </span>
+        <span class="text-slate-400">Page 4</span>
+      </li>
+      <li class="flex justify-between items-center border-b border-slate-100 pb-2">
+        <span class="flex items-center gap-3">
+          <span class="w-6 h-6 rounded-full bg-cnps-50 text-cnps-800 flex items-center justify-center text-xs font-black">3</span>
+          3. Prise en main des Escalades & Réaffectation
+        </span>
+        <span class="text-slate-400">Page 5</span>
+      </li>
+      <li class="flex justify-between items-center border-b border-slate-100 pb-2">
+        <span class="flex items-center gap-3">
+          <span class="w-6 h-6 rounded-full bg-cnps-50 text-cnps-800 flex items-center justify-center text-xs font-black">4</span>
+          4. Gestion du Référentiel National
+        </span>
+        <span class="text-slate-400">Page 6</span>
+      </li>
+      <li class="flex justify-between items-center border-b border-slate-100 pb-2">
+        <span class="flex items-center gap-3">
+          <span class="w-6 h-6 rounded-full bg-cnps-50 text-cnps-800 flex items-center justify-center text-xs font-black">5</span>
+          5. Administration des Fichiers Usagers
+        </span>
+        <span class="text-slate-400">Page 7</span>
+      </li>
+    </ul>
+  </div>
+
+  <!-- SECTION 1 -->
+  <div class="page-break space-y-6">
+    <div class="flex items-center gap-3 border-b-2 border-cnps-800 pb-3">
+      <div class="w-8 h-8 rounded-xl bg-cnps-800 text-white flex items-center justify-center text-lg font-black">1</div>
+      <h2 class="text-2xl font-black text-slate-800 uppercase tracking-tight">Introduction au Rôle de Superviseur Central</h2>
+    </div>
+
+    <p class="text-slate-600">
+      Le **Superviseur Central** est l'autorité métier nationale de l'application eRéclamations. Vous assurez la supervision de l'intégralité du réseau des agences de la CNPS. Vous pilotez la performance nationale, configurez les règles de gestion, arbitrez les conflits d'affectation et gérez les dossiers complexes escaladés par les pilotes en agence.
+    </p>
+
+    <div class="bg-slate-50 p-6 rounded-2xl border border-slate-100 space-y-4 avoid-break">
+      <h3 class="font-extrabold text-slate-800 text-base">Vos Responsabilités Principales</h3>
+      <div class="grid grid-cols-2 gap-4 text-xs">
+        <div class="bg-white p-3.5 rounded-xl border border-slate-200/60 shadow-sm">
+          <span class="font-black text-cnps-800 uppercase tracking-wide block mb-1">🌍 Vision Globale</span>
+          Superviser les indicateurs de performance de toutes les agences de la CNPS en temps réel.
+        </div>
+        <div class="bg-white p-3.5 rounded-xl border border-slate-200/60 shadow-sm">
+          <span class="font-black text-cnps-800 uppercase tracking-wide block mb-1">⚡ Arbitrage & Escalades</span>
+          Réaffecter les tickets, attribuer de nouveaux pilotes et traiter les réclamations sensibles.
+        </div>
+        <div class="bg-white p-3.5 rounded-xl border border-slate-200/60 shadow-sm">
+          <span class="font-black text-cnps-800 uppercase tracking-wide block mb-1">🛠️ Configuration Métier</span>
+          Réguler les SLA, créer les motifs et configurer les règles de routage automatique.
+        </div>
+        <div class="bg-white p-3.5 rounded-xl border border-slate-200/60 shadow-sm">
+          <span class="font-black text-cnps-800 uppercase tracking-wide block mb-1">📁 Fichiers de Référence</span>
+          Consulter et modifier les bases des Travailleurs, Employeurs et Sinistres de Côte d'Ivoire.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 2 -->
+  <div class="page-break space-y-6">
+    <div class="flex items-center gap-3 border-b-2 border-cnps-800 pb-3">
+      <div class="w-8 h-8 rounded-xl bg-cnps-800 text-white flex items-center justify-center text-lg font-black">2</div>
+      <h2 class="text-2xl font-black text-slate-800 uppercase tracking-tight">Commutation Multi-Agences & Dashboard Central</h2>
+    </div>
+
+    <p class="text-slate-600">
+      Votre tableau de bord intègre une fonctionnalité essentielle : la **commutation dynamique de vue**.
+    </p>
+
+    <div class="space-y-4">
+      <div class="flex gap-4 items-start avoid-break">
+        <span class="w-6 h-6 rounded-full bg-cnps-800 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-1">1</span>
+        <div>
+          <h4 class="font-extrabold text-slate-800 text-sm">Le Sélecteur d'Agence</h4>
+          <p class="text-xs text-slate-500 mt-1">
+            En haut de votre écran d'accueil, cliquez sur la liste déroulante **"Sélectionner l'agence"**. Par défaut, vous êtes positionné sur la vue globale "Toutes agences". Sélectionnez une agence physique spécifique (ex: *Marcory, Yamoussoukro, Bouaké*).
+          </p>
+        </div>
+      </div>
+
+      <div class="flex gap-4 items-start avoid-break">
+        <span class="w-6 h-6 rounded-full bg-cnps-800 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-1">2</span>
+        <div>
+          <h4 class="font-extrabold text-slate-800 text-sm">Rapport statistique instantané</h4>
+          <p class="text-xs text-slate-500 mt-1">
+            Une fois l'agence sélectionnée, l'ensemble du tableau de bord se met à jour instantanément pour n'afficher que les indicateurs de cette agence. Vous pouvez analyser son taux de respect de la SLA, voir ses dossiers en souffrance, ou lister ses agents actifs.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 3 -->
+  <div class="page-break space-y-6">
+    <div class="flex items-center gap-3 border-b-2 border-cnps-800 pb-3">
+      <div class="w-8 h-8 rounded-xl bg-cnps-800 text-white flex items-center justify-center text-lg font-black">3</div>
+      <h2 class="text-2xl font-black text-slate-800 uppercase tracking-tight">Gestion des Escalades & Réaffectation</h2>
+    </div>
+
+    <p class="text-slate-600">
+      Les pilotes en agence peuvent solliciter une **escalade centrale** lorsque le dossier requiert une expertise métier pointue ou un arbitrage national.
+    </p>
+
+    <div class="space-y-4">
+      <div class="flex gap-4 items-start avoid-break">
+        <span class="w-6 h-6 rounded-full bg-cnps-800 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-1">1</span>
+        <div>
+          <h4 class="font-extrabold text-slate-800 text-sm">Suivi des Escalades</h4>
+          <p class="text-xs text-slate-500 mt-1">
+            Accédez à la file **"Escaladées"** depuis votre menu. Lisez le motif d'escalade rédigé par le pilote d'agence et examinez le dossier historique.
+          </p>
+        </div>
+      </div>
+
+      <div class="flex gap-4 items-start avoid-break">
+        <span class="w-6 h-6 rounded-full bg-cnps-800 text-white flex items-center justify-center text-xs font-bold shrink-0 mt-1">2</span>
+        <div>
+          <h4 class="font-extrabold text-slate-800 text-sm">Réaffectation et Affectation de Pilote</h4>
+          <p class="text-xs text-slate-500 mt-1">
+            En tant que Superviseur, vous pouvez **modifier l'agence cible** d'une réclamation pour la renvoyer vers la bonne entité, ou **affecter manuellement un pilote** spécifique pour forcer la prise en charge immédiate.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 4 -->
+  <div class="page-break space-y-6">
+    <div class="flex items-center gap-3 border-b-2 border-cnps-800 pb-3">
+      <div class="w-8 h-8 rounded-xl bg-cnps-800 text-white flex items-center justify-center text-lg font-black">4</div>
+      <h2 class="text-2xl font-black text-slate-800 uppercase tracking-tight">Gestion du Référentiel National (Administration)</h2>
+    </div>
+
+    <p class="text-slate-600">
+      Votre profil Superviseur vous octroie l'accès complet à la configuration de la mécanique de l'application via le panneau **"Administration"** :
+    </p>
+
+    <div class="bg-slate-50 p-5 rounded-xl border border-slate-200/50 space-y-3 avoid-break">
+      <h4 class="font-extrabold text-slate-800 text-sm uppercase">Vos Onglets d'Administration Métier :</h4>
+      <div class="grid grid-cols-2 gap-4 text-xs">
+        <div class="bg-white p-3 rounded-lg shadow-sm border border-slate-100">
+          <span class="font-extrabold text-cnps-800 block mb-1">⚙️ Processus</span>
+          Créer et éditer les processus métiers CNPS et leurs codes associés.
+        </div>
+        <div class="bg-white p-3 rounded-lg shadow-sm border border-slate-100">
+          <span class="font-extrabold text-cnps-800 block mb-1">🏷️ Motifs & SLA</span>
+          Créer les motifs et sous-motifs, et leur attribuer leur **délai SLA réglementaire en jours**.
+        </div>
+        <div class="bg-white p-3 rounded-lg shadow-sm border border-slate-100">
+          <span class="font-extrabold text-cnps-800 block mb-1">🧩 Causes (Analyse)</span>
+          Gérer les catégories de causes de dysfonctionnement et les causes précises pour l'analyse.
+        </div>
+        <div class="bg-white p-3 rounded-lg shadow-sm border border-slate-100">
+          <span class="font-extrabold text-cnps-800 block mb-1">📍 Affectations Automatiques</span>
+          Définir les règles de routage : vers quelle agence doit être dirigée automatiquement une réclamation sur tel motif.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SECTION 5 -->
+  <div class="page-break space-y-6">
+    <div class="flex items-center gap-3 border-b-2 border-cnps-800 pb-3">
+      <div class="w-8 h-8 rounded-xl bg-cnps-800 text-white flex items-center justify-center text-lg font-black">5</div>
+      <h2 class="text-2xl font-black text-slate-800 uppercase tracking-tight">Administration des Fichiers Usagers</h2>
+    </div>
+
+    <p class="text-slate-600">
+      Vous avez la responsabilité de consulter et de tenir à jour les bases de données d'identification des usagers importées dans l'application :
+    </p>
+
+    <div class="space-y-4 text-xs avoid-break">
+      <div class="p-4 bg-slate-50 rounded-xl border border-slate-200/50 flex gap-4">
+        <div class="font-extrabold text-slate-800 uppercase shrink-0 w-24">👷 Travailleurs</div>
+        <div class="text-slate-500">Consulter la liste de tous les assurés sociaux (travailleurs salariés, indépendants RSTI), vérifier leurs matricules, adresses, et corriger leurs données d'identification de base.</div>
+      </div>
+      <div class="p-4 bg-slate-50 rounded-xl border border-slate-200/50 flex gap-4">
+        <div class="font-extrabold text-slate-800 uppercase shrink-0 w-24">🏢 Employeurs</div>
+        <div class="text-slate-500">Consulter et mettre à jour la liste des entreprises cotisantes, leurs numéros CNPS officiels, dénominations sociales et adresses.</div>
+      </div>
+      <div class="p-4 bg-slate-50 rounded-xl border border-slate-200/50 flex gap-4">
+        <div class="font-extrabold text-slate-800 uppercase shrink-0 w-24">🤕 Sinistres</div>
+        <div class="text-slate-500">Consulter le registre national des accidents du travail et maladies professionnelles déclarés, ainsi que les assurés concernés, indispensable pour l'instruction des réclamations liées aux risques professionnels.</div>
+      </div>
+    </div>
+  </div>
+
+  </div>
+
+</body>
+</html>
