@@ -20,12 +20,13 @@ class AuthController
     {
         $data = json_decode(file_get_contents('php://input'), true);
 
-        $email    = trim($data['email']    ?? '');
-        $password = trim($data['password'] ?? '');
+        // Accepter 'identifiant' ou 'email' pour rétro-compatibilité
+        $identifiant = trim($data['identifiant'] ?? $data['email'] ?? '');
+        $password    = trim($data['password'] ?? '');
 
-        if (!$email || !$password) {
+        if (!$identifiant || !$password) {
             http_response_code(400);
-            echo json_encode(['error' => 'Email et mot de passe requis']);
+            echo json_encode(['error' => 'Identifiant et mot de passe requis']);
             return;
         }
 
@@ -38,14 +39,14 @@ class AuthController
             FROM utilisateurs u
             JOIN ressources r ON r.id = u.ressource_id
             JOIN agences    a ON a.id = r.agence_id
-            WHERE u.email = :email
+            WHERE u.email = :ident_email OR r.matricule = :ident_mat
         ");
-        $stmt->execute([':email' => $email]);
+        $stmt->execute([':ident_email' => $identifiant, ':ident_mat' => $identifiant]);
         $user = $stmt->fetch();
 
         if (!$user || !$user['actif'] || !password_verify($password, $user['password'])) {
             sleep(1); // Anti brute-force
-            Audit::log(null, 'login_failed', "Échec de connexion (Email: $email)");
+            Audit::log(null, 'login_failed', "Échec de connexion (Identifiant: $identifiant)");
             http_response_code(401);
             echo json_encode(['error' => 'Identifiants incorrects']);
             return;

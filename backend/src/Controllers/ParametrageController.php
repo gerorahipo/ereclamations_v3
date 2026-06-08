@@ -516,20 +516,22 @@ class ParametrageController
                 $resId = $stmtR->fetchColumn();
             }
 
-            // 2. Créer l'utilisateur
+            // 2. Créer l'utilisateur (email optionnel)
+            $email = !empty(trim($data['email'] ?? '')) ? trim($data['email']) : null;
             $stmtU = $pdo->prepare("
                 INSERT INTO utilisateurs (ressource_id, email, password, role)
                 VALUES (:rid, :email, :pass, :role)
             ");
             $stmtU->execute([
                 ':rid'   => $resId,
-                ':email' => $data['email'],
+                ':email' => $email,
                 ':pass'  => password_hash($data['password'] ?? bin2hex(random_bytes(8)), PASSWORD_DEFAULT),
                 ':role'  => $data['role']
             ]);
 
             $pdo->commit();
-            Audit::log(null, 'admin_action', "Utilisateur créé: {$data['email']} (Rôle: {$data['role']})");
+            $label = $data['matricule'] ?? $email ?? 'N/A';
+            Audit::log(null, 'admin_action', "Utilisateur créé: {$label} (Rôle: {$data['role']})");
             http_response_code(201);
             echo json_encode(['message' => 'Utilisateur créé']);
         } catch (\Exception $e) {
@@ -573,10 +575,11 @@ class ParametrageController
                 $stmtR->execute($paramsR);
             }
 
-            // 3. Mettre à jour l'utilisateur
+            // 3. Mettre à jour l'utilisateur (email optionnel)
+            $email = !empty(trim($data['email'] ?? '')) ? trim($data['email']) : null;
             $sql = "UPDATE utilisateurs SET email = :email, role = :role, actif = :act";
             $params = [
-                ':email' => $data['email'],
+                ':email' => $email,
                 ':role'  => $data['role'],
                 ':act'   => $data['actif'] ? 'true' : 'false',
                 ':id'    => $id
@@ -592,7 +595,8 @@ class ParametrageController
             $stmtU->execute($params);
 
             $pdo->commit();
-            Audit::log(null, 'admin_action', "Utilisateur mis à jour: {$data['email']} (ID: $id)");
+            $label = $data['matricule'] ?? $email ?? "ID: $id";
+            Audit::log(null, 'admin_action', "Utilisateur mis à jour: {$label} (ID: $id)");
             echo json_encode(['message' => 'Utilisateur mis à jour']);
         } catch (\Exception $e) {
             $pdo->rollBack();

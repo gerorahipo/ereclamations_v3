@@ -38,11 +38,11 @@ export function AuthProvider({ children }) {
     setLoading(false)
   }, [token])
 
-  const login = useCallback(async (email, password) => {
+  const login = useCallback(async (identifiant, password) => {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ identifiant, password }),
     })
 
     const data = await res.json()

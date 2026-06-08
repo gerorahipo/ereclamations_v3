@@ -37,7 +37,7 @@ CREATE TABLE ressources (
 CREATE TABLE utilisateurs (
     id           SERIAL PRIMARY KEY,
     ressource_id INTEGER      NOT NULL REFERENCES ressources(id) ON DELETE CASCADE,
-    email        VARCHAR(200) NOT NULL UNIQUE,
+    email        VARCHAR(200),
     password     VARCHAR(255) NOT NULL,
     role         VARCHAR(30)  NOT NULL CHECK (role IN ('agent', 'pilote', 'coordonnateur', 'superviseur', 'administrateur')),
     actif        BOOLEAN      NOT NULL DEFAULT TRUE,

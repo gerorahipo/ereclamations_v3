@@ -7,7 +7,7 @@ export default function Login() {
   const { login } = useAuth()
   const navigate = useNavigate()
 
-  const [form, setForm] = useState({ email: '', password: '' })
+  const [form, setForm] = useState({ identifiant: '', password: '' })
   const [showPwd, setShowPwd] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
@@ -17,7 +17,7 @@ export default function Login() {
     setError('')
     setLoading(true)
     try {
-      await login(form.email, form.password)
+      await login(form.identifiant, form.password)
       navigate('/')
     } catch (err) {
       setError(err.message)
@@ -50,18 +50,18 @@ export default function Login() {
             </header>
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="space-y-2">
-                <label className="text-xs font-semibold text-slate-600 block uppercase tracking-wider" htmlFor="email">
-                  Email professionnel
+                <label className="text-xs font-semibold text-slate-600 block uppercase tracking-wider" htmlFor="identifiant">
+                  Matricule ou Email
                 </label>
                 <div className="relative group">
                   <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    value={form.email}
-                    onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
+                    id="identifiant"
+                    name="identifiant"
+                    type="text"
+                    value={form.identifiant}
+                    onChange={e => setForm(f => ({ ...f, identifiant: e.target.value }))}
                     className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-sm text-slate-900 focus:ring-2 focus:ring-cnps-800 focus:border-cnps-800 transition-all duration-150"
-                    placeholder="vous@cnps.ci"
+                    placeholder="Ex: 12345 ou vous@cnps.ci"
                     required
                   />
                 </div>
