@@ -39,7 +39,7 @@ CREATE TABLE utilisateurs (
     ressource_id INTEGER      NOT NULL REFERENCES ressources(id) ON DELETE CASCADE,
     email        VARCHAR(200) NOT NULL UNIQUE,
     password     VARCHAR(255) NOT NULL,
-    role         VARCHAR(30)  NOT NULL CHECK (role IN ('agent', 'pilote', 'coordonnateur', 'superviseur')),
+    role         VARCHAR(30)  NOT NULL CHECK (role IN ('agent', 'pilote', 'coordonnateur', 'superviseur', 'administrateur')),
     actif        BOOLEAN      NOT NULL DEFAULT TRUE,
     last_login   TIMESTAMP,
     created_at   TIMESTAMP    NOT NULL DEFAULT NOW()
