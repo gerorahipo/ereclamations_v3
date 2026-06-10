@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "clean": "rm -rf dist",
+    "prebuild": "npm run clean",
     "build": "vite build",
     "preview": "vite preview"
   },

@@ -8,6 +8,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'logo-cnps.png'],
+      workbox: {
+        cleanupOutdatedCaches: true,
+      },
       manifest: {
         name: 'eRéclamations CNPS',
         short_name: 'eRéclamations',
