@@ -24,10 +24,10 @@ class ReclamationModel
         if (!$rec) return false;
 
         return match($user['role']) {
-            'agent'                     => (int)$rec['agent_createur_id'] === (int)$user['id'],
-            'pilote', 'coordonnateur'   => (int)$rec['agence_id'] === (int)$user['agence_id'] || (int)$rec['agence_origine_id'] === (int)$user['agence_id'],
-            'superviseur'               => true,
-            default                     => false,
+            'agent'              => (int)$rec['agent_createur_id'] === (int)$user['id'],
+            'pilote', 'manager', 'superviseur'  => (int)$rec['agence_id'] === (int)$user['agence_id'] || (int)$rec['agence_origine_id'] === (int)$user['agence_id'],
+            'coordonnateur', 'administrateur_fonctionnel', 'administrateur_systeme' => true,
+            default              => false,
         };
     }
 

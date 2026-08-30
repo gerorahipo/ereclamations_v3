@@ -13,6 +13,7 @@ use App\Utils\Audit;
 class AttachmentController
 {
     private string $uploadDir;
+    private const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 Mo
     private array $allowedExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'txt'];
     private array $allowedMimes = [
         'application/pdf', 
@@ -91,9 +92,16 @@ class AttachmentController
             $name     = is_array($files['name']) ? $files['name'][$i] : $files['name'];
             $tmpPath  = is_array($files['tmp_name']) ? $files['tmp_name'][$i] : $files['tmp_name'];
             $error    = is_array($files['error']) ? $files['error'][$i] : $files['error'];
+            $size     = is_array($files['size']) ? $files['size'][$i] : $files['size'];
 
             if ($error !== UPLOAD_ERR_OK) {
                 $errors[] = "Erreur d'upload pour {$name}";
+                continue;
+            }
+
+            // 0. Validation de la taille (5 Mo maximum)
+            if ($size > self::MAX_FILE_SIZE) {
+                $errors[] = "Fichier trop volumineux (max 5 Mo) : {$name}";
                 continue;
             }
 
@@ -155,6 +163,7 @@ class AttachmentController
     {
         Auth::require();
         $pdo = Database::getConnection();
+        $user = Auth::$user;
 
         $stmt = $pdo->prepare("SELECT * FROM pieces_jointes WHERE id = :id");
         $stmt->execute([':id' => $id]);
@@ -163,6 +172,12 @@ class AttachmentController
         if (!$pj) {
             http_response_code(404);
             echo json_encode(['error' => 'Fichier introuvable']);
+            return;
+        }
+
+        if (!$this->checkAccess($pdo, (int)$pj['reclamation_id'], $user)) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Accès non autorisé à ce fichier']);
             return;
         }
 
@@ -205,7 +220,13 @@ class AttachmentController
             return;
         }
 
-        if ($pj['cree_par'] != $user['id'] && !in_array($user['role'], ['superviseur', 'coordonnateur'])) {
+        // Seul le créateur du fichier, ou un coordonnateur/superviseur de la même
+        // agence que la réclamation, peut supprimer une pièce jointe.
+        $isOwner = (int)$pj['cree_par'] === (int)$user['id'];
+        $isPrivilegedInScope = in_array($user['role'], ['manager', 'administrateur_fonctionnel', 'administrateur_systeme'], true)
+            && $this->checkAccess($pdo, (int)$pj['reclamation_id'], $user);
+
+        if (!$isOwner && !$isPrivilegedInScope) {
             http_response_code(403);
             echo json_encode(['error' => 'Action non autorisée']);
             return;
@@ -230,7 +251,7 @@ class AttachmentController
     // ─── Helper: vérification des droits sur la réclamation ──
     private function checkAccess($pdo, int $reclamationId, array $user): bool
     {
-        if ($user['role'] === 'administrateur' || $user['role'] === 'superviseur') {
+        if (in_array($user['role'], ['coordonnateur', 'administrateur_fonctionnel', 'administrateur_systeme'], true)) {
             return true;
         }
 
@@ -256,7 +277,7 @@ class AttachmentController
             return (int)$rec['agent_createur_id'] === (int)$user['id'];
         }
 
-        if (in_array($user['role'], ['pilote', 'coordonnateur'])) {
+        if (in_array($user['role'], ['pilote', 'manager', 'superviseur'])) {
             return (int)$rec['agence_id'] === (int)$user['agence_id'] || (int)$rec['agence_origine_id'] === (int)$user['agence_id'];
         }
 

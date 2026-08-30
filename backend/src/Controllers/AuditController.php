@@ -6,7 +6,7 @@ use App\Middleware\Auth;
 
 class AuditController {
     public function list() {
-        Auth::requireRole(['administrateur', 'superviseur']);
+        Auth::requireRole(['administrateur_systeme']);
         
         $db = Database::getConnection();
         $params = [];

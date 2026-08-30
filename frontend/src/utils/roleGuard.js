@@ -6,14 +6,20 @@ export const ROLES = {
   AGENT:         'agent',
   PILOTE:        'pilote',
   COORDONNATEUR: 'coordonnateur',
+  MANAGER:       'manager',
   SUPERVISEUR:   'superviseur',
+  ADMIN_FONCTIONNEL: 'administrateur_fonctionnel',
+  ADMIN_SYSTEME:     'administrateur_systeme',
 }
 
 export const ROLE_LABELS = {
-  agent:         'Agent de guichet',
+  agent:         'Agent accueil et relations client',
   pilote:        'Pilote',
-  coordonnateur: 'Manager de service/section accueil réclamations',
+  coordonnateur: 'Coordonnateur (structure centrale)',
+  manager:       'Manager de service/section accueil réclamations',
   superviseur:   'Superviseur',
+  administrateur_fonctionnel: 'Administrateur fonctionnel',
+  administrateur_systeme:     'Administrateur système',
 }
 
 export const STATUTS = {
@@ -43,7 +49,7 @@ export function canPerformAction(user, action, reclamation = null) {
       return true // tous les rôles peuvent créer
 
     case 'view':
-      if (user.role === 'superviseur') return true
+      if (['superviseur', 'coordonnateur', 'administrateur_fonctionnel', 'administrateur_systeme'].includes(user.role)) return true
       if (user.role === 'agent') return reclamation?.agent_createur_id === user.id
       return reclamation?.agence_id === user.agence_id
 
@@ -63,12 +69,12 @@ export function canPerformAction(user, action, reclamation = null) {
 
     case 'valider':
     case 'retourner':
-      return (user.role === 'coordonnateur' || user.role === 'superviseur')
+      return (user.role === 'manager' || user.role === 'superviseur')
         && reclamation?.statut === 'a_valider'
         && (user.role === 'superviseur' || reclamation?.agence_id === user.agence_id)
 
     case 'admin':
-      return user.role === 'superviseur' || user.role === 'coordonnateur'
+      return ['superviseur', 'administrateur_fonctionnel', 'administrateur_systeme'].includes(user.role)
 
     default:
       return false

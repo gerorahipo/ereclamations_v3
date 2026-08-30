@@ -24,7 +24,17 @@ async function request(path, options = {}) {
     return
   }
 
-  const data = await res.json()
+  const text = await res.text()
+  let data
+  try {
+    data = text ? JSON.parse(text) : {}
+  } catch {
+    // Réponse non-JSON (proxy, service worker périmé, page d'erreur HTML...) :
+    // on évite un crash cryptique et on donne une piste de résolution claire.
+    throw new Error(
+      `Réponse invalide du serveur (${res.status}). Si le problème persiste, videz le Service Worker / cache hors ligne du site puis rechargez.`
+    )
+  }
   if (!res.ok) throw new Error(data.error || `Erreur ${res.status}`)
   return data
 }
@@ -50,6 +60,7 @@ export const reclamationsApi = {
   updateRemarques: (id, body)  => request(`/reclamations/${id}/remarques`, { method: 'PUT', body: JSON.stringify(body) }),
   escalader: (id, body)      => request(`/reclamations/${id}/escalader`, { method: 'PUT', body: JSON.stringify(body) }),
   qualify: (id, body)        => request(`/reclamations/${id}/qualify`, { method: 'PUT', body: JSON.stringify(body) }),
+  updateInfos: (id, body)    => request(`/reclamations/${id}/infos`, { method: 'PUT', body: JSON.stringify(body) }),
 }
 
 // ─── Actions de traitement ────────────────────────────────────
@@ -106,7 +117,8 @@ export const parametrageApi = {
   utilisateurs: (params)   => request('/utilisateurs?' + new URLSearchParams(params || {})),
   saveUtilisateur:(body)   => request('/utilisateurs', { method: 'POST', body: JSON.stringify(body) }),
   updateUtilisateur:(id, body) => request(`/utilisateurs/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
-  stats:        ()         => request('/stats'),
+  stats:        (params = {}) => request('/stats?' + new URLSearchParams(params)),
+  reporting:    ()         => request('/reporting'),
   saveRessource: (body)     => request('/ressources', { method: 'POST', body: JSON.stringify(body) }),
   updateRessource: (id, body) => request(`/ressources/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
   deleteEntity: (entity, id) => request(`/${entity}/${id}`, { method: 'DELETE' }),
@@ -196,5 +208,19 @@ export const mailApi = {
   get:  ()     => request('/config-mail'),
   save: (body) => request('/config-mail', { method: 'POST', body: JSON.stringify(body) }),
   test: (body) => request('/config-mail/test', { method: 'POST', body: JSON.stringify(body) }),
+}
+
+// ─── Objectifs SLA (tableau de bord) ──────────────────────────
+export const objectifsApi = {
+  get:  ()     => request('/objectifs'),
+  save: (body) => request('/objectifs', { method: 'PUT', body: JSON.stringify(body) }),
+}
+
+// ─── Notifications (centre in-app) ────────────────────────────
+export const notificationsApi = {
+  list:         (limit = 30) => request('/notifications?limit=' + limit),
+  unreadCount:  ()   => request('/notifications/unread-count'),
+  markRead:     (id) => request(`/notifications/${id}/lu`, { method: 'PUT' }),
+  markAllRead:  ()   => request('/notifications/lu-tout', { method: 'PUT' }),
 }
 

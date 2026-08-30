@@ -9,11 +9,13 @@ import clsx from 'clsx'
 import AgencySwitcher from './AgencySwitcher.jsx'
 
 const ROLE_LABELS = {
-  agent:         'Agent de guichet',
+  agent:         'Agent accueil et relations client',
   pilote:        'Pilote',
-  coordonnateur: 'Manager de service/section accueil réclamations',
+  coordonnateur: 'Coordonnateur (structure centrale)',
+  manager:       'Manager de service/section accueil réclamations',
   superviseur:   'Superviseur',
-  administrateur: 'Administrateur',
+  administrateur_fonctionnel: 'Administrateur fonctionnel',
+  administrateur_systeme:     'Administrateur système',
 }
 
 export default function Sidebar({ isOpen, onClose }) {
@@ -89,11 +91,11 @@ export default function Sidebar({ isOpen, onClose }) {
             { label: 'Vue globale', to: '/', active: currentStatut === '' && currentQueue === '', dot: 'bg-white/20' },
             { label: 'Non affectées',     to: '/?statut=nouveau', active: currentStatut === 'nouveau', dot: 'bg-blue-400' },
             { label: 'En cours',    to: '/?statut=en_cours', active: currentStatut === 'en_cours', dot: 'bg-orange-400' },
-            { label: 'À clôturer',  to: '/?statut=a_valider', active: currentStatut === 'a_valider', dot: 'bg-violet-400' },
+            { label: 'À clôturer',  to: '/?statut=a_valider', active: currentStatut === 'a_valider', dot: 'bg-accent-400' },
             { label: 'Résolu',      to: '/?statut=resolu', active: currentStatut === 'resolu', dot: 'bg-green-400' },
             { label: 'Hors délai',  to: '/?statut=hors_sla', active: currentStatut === 'hors_sla', dot: 'bg-red-400' },
             ...(user?.role !== 'agent' ? [{ label: 'Escaladées', to: '/?queue=escaladees', active: currentQueue === 'escaladees', dot: 'bg-fuchsia-400' }] : []),
-            ...((currentAgence?.agence_nom?.toLowerCase()?.includes('digitale') || user?.role === 'administrateur') ? [{ label: 'Non qualifiées', to: '/?queue=non_qualifiees', active: currentQueue === 'non_qualifiees', dot: 'bg-indigo-400' }] : [])
+            ...((currentAgence?.agence_nom?.toLowerCase()?.includes('digitale') || isAdmin()) ? [{ label: 'Non qualifiées', to: '/?queue=non_qualifiees', active: currentQueue === 'non_qualifiees', dot: 'bg-indigo-400' }] : [])
           ].map(({ label, to, active, dot }) => (
             <NavLink
               key={to}

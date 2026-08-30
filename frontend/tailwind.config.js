@@ -17,6 +17,18 @@ export default {
           900: '#00346f',  // Bleu CNPS foncé (sidebar)
           950: '#001e45',
         },
+        accent: {
+          50:  '#fef3e8',
+          100: '#fce1c4',
+          200: '#f9c98f',
+          300: '#f7b565',
+          400: '#f5a04d',
+          500: '#f2871f',  // Orange du logo CNPS
+          600: '#db7615',
+          700: '#b25f11',
+          800: '#8a480d',
+          900: '#5c3009',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

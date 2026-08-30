@@ -54,13 +54,13 @@ class UtilisateurModel
         return $stmt->fetchAll();
     }
 
-    public function getCoordonnateursByAgence(int $agenceId): array
+    public function getManagersByAgence(int $agenceId): array
     {
         $stmt = $this->pdo->prepare("
             SELECT u.id, r.nom, r.prenoms, u.email
             FROM utilisateurs u
             JOIN ressources r ON r.id = u.ressource_id
-            WHERE r.agence_id = :agence_id AND u.role = 'coordonnateur' AND u.actif = TRUE
+            WHERE r.agence_id = :agence_id AND u.role = 'manager' AND u.actif = TRUE
         ");
         $stmt->execute([':agence_id' => $agenceId]);
         return $stmt->fetchAll();

@@ -211,6 +211,7 @@ try {
             };
         } elseif ($id && $sub) {
             match([$method, $sub]) {
+                ['PUT',  'infos']     => $recCtrl->updateInfos($id),
                 ['PUT',  'statut']    => $recCtrl->updateStatut($id),
                 ['PUT',  'analyse']   => $recCtrl->updateAnalyse($id),
                 ['PUT',  'remarques'] => $recCtrl->updateRemarques($id),
@@ -316,7 +317,7 @@ try {
         }
 
     } elseif ($segments[0] === 'interims') {
-        App\Middleware\Auth::require(['administrateur']);
+        App\Middleware\Auth::requireRole(['administrateur_fonctionnel']);
         $ctrl = new App\Controllers\InterimController();
         $id = isset($segments[1]) && is_numeric($segments[1]) ? (int)$segments[1] : null;
 
@@ -450,6 +451,14 @@ try {
             default  => notFound(),
         };
 
+    } elseif ($segments[0] === 'objectifs') {
+        $ctrl = new App\Controllers\ParametrageController();
+        match($method) {
+            'GET'    => $ctrl->objectifs(),
+            'PUT'    => $ctrl->saveObjectifs(),
+            default  => notFound(),
+        };
+
     } elseif ($segments[0] === 'config-mail') {
         $ctrl = new App\Controllers\ConfigMailController();
         $sub  = $segments[1] ?? '';
@@ -490,6 +499,25 @@ try {
 
     } elseif ($segments[0] === 'stats') {
         (new App\Controllers\ParametrageController())->stats();
+
+    } elseif ($segments[0] === 'reporting') {
+        (new App\Controllers\ParametrageController())->reporting();
+
+    } elseif ($segments[0] === 'notifications') {
+        $ctrl = new App\Controllers\NotificationController();
+        $sub  = $segments[1] ?? null;
+
+        if ($sub === 'unread-count' && $method === 'GET') {
+            $ctrl->unreadCount();
+        } elseif ($sub === 'lu-tout' && $method === 'PUT') {
+            $ctrl->markAllRead();
+        } elseif (is_numeric($sub) && ($segments[2] ?? '') === 'lu' && $method === 'PUT') {
+            $ctrl->markRead((int)$sub);
+        } elseif ($sub === null && $method === 'GET') {
+            $ctrl->index();
+        } else {
+            notFound();
+        }
 
     } else {
         notFound();

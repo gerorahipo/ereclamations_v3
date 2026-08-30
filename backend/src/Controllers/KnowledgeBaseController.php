@@ -50,7 +50,7 @@ class KnowledgeBaseController
     // ─── POST /api/suggestions ──────────────────────────────
     public function create(): void
     {
-        Auth::requireRole(['superviseur', 'administrateur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
 
@@ -77,7 +77,7 @@ class KnowledgeBaseController
     // ─── PUT /api/suggestions/{id} ──────────────────────────
     public function update(int $id): void
     {
-        Auth::requireRole(['superviseur', 'administrateur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
 
@@ -102,7 +102,7 @@ class KnowledgeBaseController
     // ─── DELETE /api/suggestions/{id} ───────────────────────
     public function delete(int $id): void
     {
-        Auth::requireRole(['superviseur', 'administrateur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         $pdo = Database::getConnection();
         
         $stmt = $pdo->prepare("DELETE FROM suggestions_reponses WHERE id = :id");
@@ -184,7 +184,7 @@ class KnowledgeBaseController
     // ─── POST /api/kb ───────────────────────────────────────
     public function createEntry(): void
     {
-        Auth::requireRole(['superviseur', 'administrateur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
 
@@ -211,7 +211,7 @@ class KnowledgeBaseController
     // ─── PUT /api/kb/{id} ───────────────────────────────────
     public function updateEntry(int $id): void
     {
-        Auth::requireRole(['superviseur', 'administrateur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
 
@@ -236,7 +236,7 @@ class KnowledgeBaseController
     // ─── DELETE /api/kb/{id} ────────────────────────────────
     public function deleteEntry(int $id): void
     {
-        Auth::requireRole(['superviseur', 'administrateur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         $pdo = Database::getConnection();
         
         $stmt = $pdo->prepare("DELETE FROM kb_entries WHERE id = :id");

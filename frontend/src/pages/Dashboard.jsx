@@ -31,10 +31,13 @@ const STATUTS = [
 const COLORS = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#ef4444', '#6366f1', '#06b6d4', '#ec4899']
 
 const ROLE_LABELS = {
-  agent:         'Agent de guichet',
+  agent:         'Agent accueil et relations client',
   pilote:        'Pilote de processus',
-  coordonnateur: 'Manager de service/section accueil réclamations',
-  superviseur:   'Superviseur National',
+  coordonnateur: 'Coordonnateur (structure centrale)',
+  manager:       'Manager de service/section accueil réclamations',
+  superviseur:   'Superviseur',
+  administrateur_fonctionnel: 'Administrateur fonctionnel',
+  administrateur_systeme:     'Administrateur système',
 }
 
 export default function Dashboard() {
@@ -48,7 +51,10 @@ export default function Dashboard() {
   const [loading, setLoading]       = useState(true)
   const [error, setError]           = useState(null)
   const [analyticsData, setAnalyticsData] = useState({ agences: [], processus: [], evolution: [] })
-  const [view, setView] = useState('analytics') // 'analytics' or 'tickets'
+  const [reportingData, setReportingData] = useState(null) // Reporting agence du superviseur
+  const [agencesList, setAgencesList] = useState([])        // Liste des agences (coordonnateur)
+  const [coordAgence, setCoordAgence] = useState('')        // Agence choisie par le coordonnateur ('' = toutes)
+  const [view, setView] = useState('analytics') // 'analytics' (Performance/Reporting) or 'tickets'
 
   const [filters, setFilters] = useState({
     statut:       searchParams.get('statut') || '',
@@ -71,14 +77,30 @@ export default function Dashboard() {
       if (filters.queue)        params.queue = filters.queue
       if (filters.correction)   params.correction = filters.correction
 
+      // Vue d'ensemble (sans filtre ni corbeille) : on ne charge que les
+      // derniers tickets. Les listes completes restent accessibles via les
+      // corbeilles de traitement (filtres statut/queue).
+      const hasFilter = !!(filters.statut || filters.queue || filters.q || filters.hors_sla || filters.correction || filters.processus_id)
+      if (!hasFilter) params.limit = 10
+
+      // Coordonnateur : zoom sur une agence choisie ('' = toutes les agences)
+      const statsParams = {}
+      if (user.role === 'coordonnateur' && coordAgence) {
+        params.agence_id = coordAgence
+        statsParams.agence_id = coordAgence
+      }
+
       const [rec, st] = await Promise.all([
         reclamationsApi.list(params),
-        parametrageApi.stats(),
+        parametrageApi.stats(statsParams),
       ])
 
-      if (user.role === 'administrateur' || user.role === 'superviseur') {
+      if (['administrateur_fonctionnel', 'coordonnateur'].includes(user.role)) {
         const analyticsRes = await parametrageApi.analytics()
         setAnalyticsData(analyticsRes?.data || { agences: [], processus: [], evolution: [] })
+      } else if (user.role === 'superviseur') {
+        const reportingRes = await parametrageApi.reporting()
+        setReportingData(reportingRes?.data || null)
       }
 
       console.log('Dashboard Data:', { role: user.role, agence: user.agence_nom, tickets: rec?.data?.length, stats: st?.data?.counters })
@@ -93,6 +115,9 @@ export default function Dashboard() {
 
   useEffect(() => {
     parametrageApi.processus().then(d => setProcessus(d?.data || [])).catch(() => {})
+    if (user?.role === 'coordonnateur') {
+      parametrageApi.agences().then(d => setAgencesList(d?.data || [])).catch(() => {})
+    }
   }, [])
 
   useEffect(() => {
@@ -108,7 +133,7 @@ export default function Dashboard() {
     if (statut || queue) setView('tickets')
   }, [searchParams])
 
-  useEffect(() => { fetchData() }, [filters])
+  useEffect(() => { fetchData() }, [filters, coordAgence])
 
   const handleFilter = (key, val) => {
     setFilters(f => {
@@ -138,53 +163,65 @@ export default function Dashboard() {
         const isDigitalAgency = user?.agence_nom?.toLowerCase()?.includes('digitale') || false
         
         const kpis = []
-        
-        kpis.push({ 
-            label: isDigitalAgency ? 'Toutes agences' : (role === 'agent' ? 'Mes saisies' : 'Total agence'), 
-            value: c.total || 0, 
-            color: 'bg-indigo-700', 
+
+        kpis.push({
+            label: isDigitalAgency ? 'Toutes agences' : (role === 'agent' ? 'Mes saisies' : 'Total agence'),
+            value: c.total || 0,
+            color: 'bg-cnps-800',
             icon: <Users className="w-5 h-5 text-white/80" />,
             filter: { statut: '', hors_sla: '', queue: '', q: '' }
         })
-        const showNonQualifiees = isDigitalAgency || role === 'administrateur'
+        const showNonQualifiees = isDigitalAgency || ['administrateur_fonctionnel', 'administrateur_systeme'].includes(role)
 
         if (showNonQualifiees) {
             kpis.push({
                 label: 'Non qualifiées',
                 value: c.non_qualifiees || 0,
-                color: 'bg-fuchsia-600',
+                color: 'bg-accent-600',
                 icon: <Tag className="w-5 h-5 text-white/80" />,
                 filter: { queue: 'non_qualifiees', statut: '', hors_sla: '', correction: '', q: '' }
             })
         }
 
         if (role === 'agent') {
-            kpis.push({ label: 'Non affectées', value: c.nouveau, color: 'bg-blue-500', icon: <UserMinus className="w-5 h-5 text-white/80" />, filter: { statut: 'nouveau', hors_sla: '', queue: '' } })
-            kpis.push({ label: 'En cours', value: c.en_cours, color: 'bg-orange-500', icon: <Clock className="w-5 h-5 text-white/80" />, filter: { statut: 'en_cours', hors_sla: '', queue: '' } })
+            kpis.push({ label: 'Non affectées', value: c.nouveau, color: 'bg-cnps-600', icon: <UserMinus className="w-5 h-5 text-white/80" />, filter: { statut: 'nouveau', hors_sla: '', queue: '' } })
+            kpis.push({ label: 'En cours', value: c.en_cours, color: 'bg-accent-500', icon: <Clock className="w-5 h-5 text-white/80" />, filter: { statut: 'en_cours', hors_sla: '', queue: '' } })
             kpis.push({ label: 'Résolus', value: c.resolu, color: 'bg-emerald-600', icon: <CheckCircle className="w-5 h-5 text-white/80" />, filter: { statut: 'resolu', hors_sla: '', queue: '' } })
             kpis.push({ label: 'Hors délai', value: c.hors_sla, color: 'bg-red-600', icon: <AlertTriangle className="w-5 h-5 text-white/80" />, alert: true, filter: { statut: '', hors_sla: '1', queue: '' } })
-        } 
+        }
         else if (role === 'pilote') {
-            kpis.push({ label: 'Non affectées', value: c.nouveau, color: 'bg-blue-500', icon: <UserMinus className="w-5 h-5 text-white/80" />, filter: { statut: 'nouveau', hors_sla: '', queue: '', correction: '' } })
-            kpis.push({ label: 'À traiter', value: Math.max(0, parseInt(c.en_cours || 0) - parseInt(c.en_attente_correction || 0)), color: 'bg-orange-500', icon: <FileText className="w-5 h-5 text-white/80" />, filter: { statut: 'en_cours', hors_sla: '', queue: '', correction: '' } })
+            kpis.push({ label: 'Non affectées', value: c.nouveau, color: 'bg-cnps-600', icon: <UserMinus className="w-5 h-5 text-white/80" />, filter: { statut: 'nouveau', hors_sla: '', queue: '', correction: '' } })
+            kpis.push({ label: 'À traiter', value: Math.max(0, parseInt(c.en_cours || 0) - parseInt(c.en_attente_correction || 0)), color: 'bg-accent-500', icon: <FileText className="w-5 h-5 text-white/80" />, filter: { statut: 'en_cours', hors_sla: '', queue: '', correction: '' } })
             kpis.push({ label: 'À corriger', value: c.en_attente_correction || 0, color: 'bg-amber-500', icon: <RotateCcw className="w-5 h-5 text-white/80" />, pulse: parseInt(c.en_attente_correction || 0) > 0, filter: { correction: '1', statut: '', hors_sla: '', queue: '' } })
             kpis.push({ label: 'Hors délai', value: c.hors_sla, color: 'bg-red-600', icon: <AlertTriangle className="w-5 h-5 text-white/80" />, alert: true, filter: { statut: '', hors_sla: '1', queue: '', correction: '' } })
             kpis.push({ label: 'Dossiers Résolus', value: c.resolu, color: 'bg-emerald-600', icon: <CheckSquare className="w-5 h-5 text-white/80" />, filter: { statut: 'resolu', hors_sla: '', queue: '', correction: '' } })
-            kpis.push({ label: 'Suivi escalades', value: c.escaladees || 0, color: 'bg-violet-600', icon: <RotateCcw className="w-5 h-5 text-white/80" />, filter: { queue: 'escaladees', statut: '', hors_sla: '', correction: '' } })
+            kpis.push({ label: 'Suivi escalades', value: c.escaladees || 0, color: 'bg-cnps-900', icon: <RotateCcw className="w-5 h-5 text-white/80" />, filter: { queue: 'escaladees', statut: '', hors_sla: '', correction: '' } })
         }
-        else if (role === 'coordonnateur') {
-            kpis.push({ label: 'Non affectées', value: c.nouveau, color: 'bg-blue-500', icon: <UserMinus className="w-5 h-5 text-white/80" />, filter: { statut: 'nouveau', hors_sla: '', queue: '' } })
-            kpis.push({ label: 'À clôturer', value: c.a_valider, color: 'bg-violet-600', icon: <CheckSquare className="w-5 h-5 text-white/80" />, pulse: parseInt(c.a_valider || 0) > 0, filter: { statut: 'a_valider', hors_sla: '', queue: '' } })
-            kpis.push({ label: 'En cours Agence', value: c.en_cours, color: 'bg-orange-500', icon: <Users className="w-5 h-5 text-white/80" />, filter: { statut: 'en_cours', hors_sla: '', queue: '' } })
+        else if (role === 'manager') {
+            kpis.push({ label: 'Non affectées', value: c.nouveau, color: 'bg-cnps-700', icon: <UserMinus className="w-5 h-5 text-white/80" />, filter: { statut: 'nouveau', hors_sla: '', queue: '' } })
+            kpis.push({ label: 'Affectées', value: c.affectees || 0, color: 'bg-cnps-600', icon: <Users className="w-5 h-5 text-white/80" /> })
+            kpis.push({ label: 'En cours Agence', value: c.en_cours, color: 'bg-accent-500', icon: <Clock className="w-5 h-5 text-white/80" />, filter: { statut: 'en_cours', hors_sla: '', queue: '' } })
+            kpis.push({ label: 'À clôturer', value: c.a_valider, color: 'bg-accent-600', icon: <CheckSquare className="w-5 h-5 text-white/80" />, pulse: parseInt(c.a_valider || 0) > 0, filter: { statut: 'a_valider', hors_sla: '', queue: '' } })
+            kpis.push({ label: 'Clôturées', value: c.resolu, color: 'bg-emerald-600', icon: <CheckCircle className="w-5 h-5 text-white/80" />, filter: { statut: 'resolu', hors_sla: '', queue: '' } })
             kpis.push({ label: 'Hors délai Agence', value: c.hors_sla, color: 'bg-red-600', icon: <AlertTriangle className="w-5 h-5 text-white/80" />, filter: { statut: '', hors_sla: '1', queue: '' } })
-            kpis.push({ label: 'Suivi escalades', value: c.escaladees || 0, color: 'bg-violet-700', icon: <RotateCcw className="w-5 h-5 text-white/80" />, filter: { queue: 'escaladees', statut: '', hors_sla: '' } })
+            kpis.push({ label: 'Suivi escalades', value: c.escaladees || 0, color: 'bg-cnps-900', icon: <RotateCcw className="w-5 h-5 text-white/80" />, filter: { queue: 'escaladees', statut: '', hors_sla: '' } })
         }
-        else { // Superviseur / Admin
-            kpis.push({ label: 'Non affectées', value: c.nouveau, color: 'bg-blue-500', icon: <AlertCircle className="w-5 h-5 text-white/80" />, filter: { statut: 'nouveau', hors_sla: '', queue: '' } })
-            kpis.push({ label: 'En cours', value: c.en_cours, color: 'bg-orange-500', icon: <TrendingUp className="w-5 h-5 text-white/80" />, filter: { statut: 'en_cours', hors_sla: '', queue: '' } })
+        else if (role === 'superviseur') { // Directeur d'agence : supervision de son agence (+ intérim)
+            kpis.push({ label: 'Non affectés', value: c.nouveau, color: 'bg-cnps-600', icon: <UserMinus className="w-5 h-5 text-white/80" />, filter: { statut: 'nouveau', hors_sla: '', queue: '' } })
+            kpis.push({ label: 'À analyser', value: c.a_analyser || 0, color: 'bg-amber-500', icon: <Search className="w-5 h-5 text-white/80" /> })
+            kpis.push({ label: 'En cours', value: c.en_cours, color: 'bg-accent-500', icon: <Clock className="w-5 h-5 text-white/80" />, filter: { statut: 'en_cours', hors_sla: '', queue: '' } })
+            kpis.push({ label: 'À clôturer', value: c.a_valider, color: 'bg-accent-600', icon: <CheckSquare className="w-5 h-5 text-white/80" />, filter: { statut: 'a_valider', hors_sla: '', queue: '' } })
+            kpis.push({ label: 'Hors délai', value: c.hors_sla, color: 'bg-red-600', icon: <AlertTriangle className="w-5 h-5 text-white/80" />, alert: true, filter: { statut: '', hors_sla: '1', queue: '' } })
+            kpis.push({ label: 'Qualifiés', value: reportingData?.counters?.qualifies || 0, color: 'bg-cnps-500', icon: <CheckCircle className="w-5 h-5 text-white/80" /> })
+            kpis.push({ label: 'Résolus', value: c.resolu, color: 'bg-emerald-600', icon: <CheckCircle className="w-5 h-5 text-white/80" />, filter: { statut: 'resolu', hors_sla: '', queue: '' } })
+        }
+        else { // Coordonnateur / Admin
+            kpis.push({ label: 'Non affectées', value: c.nouveau, color: 'bg-cnps-600', icon: <AlertCircle className="w-5 h-5 text-white/80" />, filter: { statut: 'nouveau', hors_sla: '', queue: '' } })
+            kpis.push({ label: 'À analyser', value: c.a_analyser || 0, color: 'bg-amber-500', icon: <Search className="w-5 h-5 text-white/80" /> })
+            kpis.push({ label: 'En cours', value: c.en_cours, color: 'bg-accent-500', icon: <TrendingUp className="w-5 h-5 text-white/80" />, filter: { statut: 'en_cours', hors_sla: '', queue: '' } })
             kpis.push({ label: 'Hors délai', value: c.hors_sla, color: 'bg-red-600', icon: <AlertTriangle className="w-5 h-5 text-white/80" />, filter: { statut: '', hors_sla: '1', queue: '' } })
             kpis.push({ label: 'Clôturés', value: c.resolu, color: 'bg-emerald-600', icon: <CheckCircle className="w-5 h-5 text-white/80" />, filter: { statut: 'resolu', hors_sla: '', queue: '' } })
-            kpis.push({ label: 'Suivi escalades', value: c.escaladees || 0, color: 'bg-violet-800', icon: <RotateCcw className="w-5 h-5 text-white/80" />, filter: { queue: 'escaladees', statut: '', hors_sla: '' } })
+            kpis.push({ label: 'Suivi escalades', value: c.escaladees || 0, color: 'bg-cnps-900', icon: <RotateCcw className="w-5 h-5 text-white/80" />, filter: { queue: 'escaladees', statut: '', hors_sla: '' } })
         }
 
         return kpis
@@ -193,6 +230,135 @@ export default function Dashboard() {
   const treatedRate = stats?.counters?.total > 0 ? Math.round(((parseInt(stats.counters.resolu) + parseInt(stats.counters.rejete)) / stats.counters.total) * 100) : 0
   const slaDenominator = parseInt(stats?.counters?.resolu || 0) + parseInt(stats?.counters?.rejete || 0) + parseInt(stats?.counters?.hors_sla || 0)
   const slaRate = slaDenominator > 0 ? Math.round((parseInt(stats?.counters?.dans_sla || 0) / slaDenominator) * 100) : 0
+
+  const objectifTraitement = parseFloat(stats?.objectifs?.objectif_traitement_pct ?? 90)
+  const objectifDelai      = parseFloat(stats?.objectifs?.objectif_delai_pct ?? 90)
+  const ecartTraitement    = Math.round(treatedRate - objectifTraitement)
+  const ecartDelai         = Math.round(slaRate - objectifDelai)
+  const avgResolutionDays  = stats?.counters?.avg_resolution_days
+
+  // ─── Grille des cartes KPI operationnelles ───────────────────────
+  const renderKpiCards = () => (
+    <div className={clsx(
+      "grid grid-cols-2 gap-4",
+      getKPIs().length >= 9 ? "sm:grid-cols-3 md:grid-cols-5" :
+      getKPIs().length === 8 ? "sm:grid-cols-3 md:grid-cols-4" :
+      getKPIs().length === 7 ? "sm:grid-cols-3 md:grid-cols-4" :
+      getKPIs().length === 6 ? "sm:grid-cols-3 md:grid-cols-6" :
+      "sm:grid-cols-3 md:grid-cols-5"
+    )}>
+      {getKPIs().map((kpi, i) => (
+        <div
+          key={i}
+          onClick={() => { if (kpi.filter) { setFilters(prev => ({ ...prev, ...kpi.filter })); setView('tickets'); } }}
+          className={clsx(
+            "rounded-xl p-4 text-white shadow-md transition-transform hover:scale-[1.02] flex flex-col justify-between min-h-[104px]",
+            kpi.color,
+            kpi.pulse && "animate-pulse",
+            kpi.filter ? "cursor-pointer" : "cursor-default"
+          )}
+        >
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <span className="text-xs font-medium opacity-90 leading-snug break-words flex-1 min-w-0">{kpi.label}</span>
+            <span className="shrink-0">{kpi.icon}</span>
+          </div>
+          <div className="text-3xl font-bold">{kpi.value || 0}</div>
+        </div>
+      ))}
+    </div>
+  )
+
+  // ─── Vue Reporting du superviseur (scopée à son agence) ──────────
+  const renderReporting = () => {
+    const r = reportingData || {}
+    const pilotes = r.par_pilote || []
+    const cnt = r.counters || {}
+    const STATUT_LBL = { nouveau: 'Nouveau', en_cours: 'En cours', a_valider: 'À valider', resolu: 'Résolu', rejete: 'Rejeté' }
+    const max = (arr, key) => Math.max(1, ...arr.map(x => parseInt(x[key] || 0)))
+    const Breakdown = ({ title, items }) => {
+      const m = Math.max(1, ...items.map(i => parseInt(i.count || 0)))
+      return (
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-5">
+          <h3 className="font-bold text-slate-800 text-sm mb-3">{title}</h3>
+          <div className="space-y-2">
+            {items.length === 0 ? <p className="text-xs text-slate-400 italic">Aucune donnée</p> : items.map((it, i) => (
+              <div key={i}>
+                <div className="flex justify-between text-xs mb-0.5">
+                  <span className="text-slate-600 font-medium truncate pr-2">{it.label}</span>
+                  <span className="text-slate-800 font-bold">{it.count}</span>
+                </div>
+                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div className="h-full bg-cnps-600 rounded-full" style={{ width: `${(parseInt(it.count || 0) / m) * 100}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )
+    }
+    return (
+      <div className="space-y-6 animate-in fade-in duration-300">
+        <div className="flex items-center gap-2 text-sm text-slate-500">
+          <BarChart3 className="w-4 h-4" />
+          <span>Reporting de l'agence : <span className="font-bold text-cnps-800">{r.agence_nom || '—'}</span></span>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4">
+          {[
+            { label: 'Tickets créés', value: cnt.crees || 0, color: 'text-cnps-800' },
+            { label: 'Qualifiés', value: cnt.qualifies || 0, color: 'text-emerald-700' },
+            { label: 'Non qualifiés', value: cnt.non_qualifies || 0, color: 'text-accent-700' },
+          ].map((k, i) => (
+            <div key={i} className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm">
+              <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{k.label}</p>
+              <p className={clsx("text-3xl font-black mt-1", k.color)}>{k.value}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-slate-100 flex items-center gap-2">
+            <Users className="w-4 h-4 text-cnps-700" />
+            <h3 className="font-bold text-slate-800 text-sm">Charge et productivité par pilote</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="table-cnps">
+              <thead>
+                <tr>
+                  <th>Pilote</th>
+                  <th className="text-right">À affecter</th>
+                  <th className="text-right">En cours</th>
+                  <th className="text-right">Résolus</th>
+                  <th className="text-right">Hors délai</th>
+                  <th className="text-right">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pilotes.length === 0 ? (
+                  <tr><td colSpan={6} className="text-center text-slate-400 italic py-6">Aucun pilote rattaché à cette agence</td></tr>
+                ) : pilotes.map((p, i) => (
+                  <tr key={i}>
+                    <td className="font-bold text-slate-700">{p.prenoms} {p.nom}</td>
+                    <td className="text-right text-slate-500">{p.a_affecter}</td>
+                    <td className="text-right">{p.en_cours}</td>
+                    <td className="text-right text-emerald-700 font-semibold">{p.resolus}</td>
+                    <td className="text-right text-red-600 font-semibold">{p.hors_delai}</td>
+                    <td className="text-right font-black">{p.total}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <Breakdown title="Par statut" items={(r.par_statut || []).map(s => ({ label: STATUT_LBL[s.statut] || s.statut, count: s.count }))} />
+          <Breakdown title="Par processus métier" items={(r.par_processus || []).map(p => ({ label: p.libelle, count: p.count }))} />
+          <Breakdown title="Top motifs" items={(r.par_motif || []).map(m => ({ label: m.libelle, count: m.count }))} />
+        </div>
+      </div>
+    )
+  }
 
   const renderAnalytics = () => {
     const { agences, processus, evolution } = analyticsData
@@ -409,7 +575,18 @@ export default function Dashboard() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {(user?.role === 'administrateur' || user?.role === 'superviseur') && (
+          {user?.role === 'coordonnateur' && agencesList.length > 0 && (
+            <select
+              value={coordAgence}
+              onChange={e => setCoordAgence(e.target.value)}
+              title="Filtrer les indicateurs par agence"
+              className="form-select text-xs font-bold border-slate-200 max-w-[240px]"
+            >
+              <option value="">Toutes les agences</option>
+              {agencesList.map(a => <option key={a.id} value={a.id}>{a.nom}</option>)}
+            </select>
+          )}
+          {['superviseur', 'administrateur_fonctionnel', 'coordonnateur'].includes(user?.role) && (
             <div className="flex bg-slate-100 p-1 rounded-xl mr-2">
               <button 
                 onClick={() => setView('analytics')}
@@ -419,7 +596,7 @@ export default function Dashboard() {
                 )}
               >
                 <BarChart3 className="w-4 h-4" />
-                Performance
+                {user?.role === 'superviseur' ? 'Reporting' : 'Performance'}
               </button>
               <button 
                 onClick={() => setView('tickets')}
@@ -433,7 +610,7 @@ export default function Dashboard() {
               </button>
             </div>
           )}
-          {(user?.role !== 'administrateur' && user?.role !== 'superviseur') && (
+          {['agent', 'pilote', 'manager'].includes(user?.role) && (
             <button
               onClick={() => navigate('/reclamations/nouvelle')}
               className="btn-primary shadow-lg shadow-cnps-100"
@@ -446,70 +623,106 @@ export default function Dashboard() {
       </div>
 
       {view === 'analytics' ? (
-        user?.role === 'administrateur' || user?.role === 'superviseur' ? (
+        user?.role === 'superviseur' ? (
+          <div className="space-y-6">
+            {renderKpiCards()}
+            {renderReporting()}
+          </div>
+        ) : user?.role === 'coordonnateur' ? (
+          <div className="space-y-6">
+            {renderKpiCards()}
+            {renderAnalytics()}
+          </div>
+        ) : user?.role === 'administrateur_fonctionnel' ? (
           renderAnalytics()
         ) : (
           <>
             {/* KPI Cards section */}
-            <div className="flex flex-wrap gap-4 min-h-[100px]">
-              <div className={clsx(
-                "grid grid-cols-2 flex-1 gap-4",
-                getKPIs().length === 8 ? "md:grid-cols-8" :
-                getKPIs().length === 7 ? "md:grid-cols-7" :
-                getKPIs().length === 6 ? "md:grid-cols-6" :
-                "md:grid-cols-5"
-              )}>
-                {getKPIs().map((kpi, i) => (
-                  <div 
-                    key={i} 
-                    onClick={() => {
-                      if (kpi.filter) {
-                        setFilters(prev => ({ ...prev, ...kpi.filter }));
-                        setView('tickets');
-                      }
-                    }}
-                    className={clsx(
-                      "rounded-xl p-4 text-white shadow-md transition-transform hover:scale-[1.02] cursor-pointer",
-                      kpi.color,
-                      kpi.pulse && "animate-pulse"
-                    )}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium opacity-90">{kpi.label}</span>
-                      {kpi.icon}
-                    </div>
-                    <div className="text-3xl font-bold">{kpi.value || 0}</div>
+            <div className={clsx(
+              "grid grid-cols-2 gap-4",
+              // Au-delà de 6 KPI, on répartit sur 2 lignes pour garder des cartes lisibles
+              getKPIs().length >= 9 ? "sm:grid-cols-3 md:grid-cols-5" :
+              getKPIs().length === 8 ? "sm:grid-cols-3 md:grid-cols-4" :
+              getKPIs().length === 7 ? "sm:grid-cols-3 md:grid-cols-4" :
+              getKPIs().length === 6 ? "sm:grid-cols-3 md:grid-cols-6" :
+              "sm:grid-cols-3 md:grid-cols-5"
+            )}>
+              {getKPIs().map((kpi, i) => (
+                <div
+                  key={i}
+                  onClick={() => {
+                    if (kpi.filter) {
+                      setFilters(prev => ({ ...prev, ...kpi.filter }));
+                      setView('tickets');
+                    }
+                  }}
+                  className={clsx(
+                    "rounded-xl p-4 text-white shadow-md transition-transform hover:scale-[1.02] flex flex-col justify-between min-h-[104px]",
+                    kpi.color,
+                    kpi.pulse && "animate-pulse",
+                    kpi.filter ? "cursor-pointer" : "cursor-default"
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <span className="text-xs font-medium opacity-90 leading-snug break-words flex-1 min-w-0">{kpi.label}</span>
+                    <span className="shrink-0">{kpi.icon}</span>
                   </div>
-                ))}
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4 w-full lg:w-[400px]">
-                <div className="card flex flex-col items-center justify-center p-4 bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg border-none">
-                  <div className="relative w-24 h-24 flex items-center justify-center">
-                    <svg className="w-full h-full transform -rotate-90">
-                      <circle cx="48" cy="48" r="40" fill="transparent" stroke="rgba(255,255,255,0.2)" strokeWidth="8" />
-                      <circle cx="48" cy="48" r="40" fill="transparent" stroke="white" strokeWidth="8" 
-                              strokeDasharray={2 * Math.PI * 40} 
-                              strokeDashoffset={2 * Math.PI * 40 * (1 - treatedRate / 100)}
-                              strokeLinecap="round" />
-                    </svg>
-                    <span className="absolute text-xl font-bold">{treatedRate}%</span>
-                  </div>
-                  <p className="text-xs font-semibold mt-3 text-center uppercase tracking-wider">Réclamations traitées</p>
+                  <div className="text-3xl font-bold">{kpi.value || 0}</div>
                 </div>
+              ))}
+            </div>
 
-                <div className="card flex flex-col items-center justify-center p-4 bg-gradient-to-br from-orange-400 to-orange-500 text-white shadow-lg border-none">
-                  <div className="relative w-24 h-24 flex items-center justify-center">
-                    <svg className="w-full h-full transform -rotate-90">
-                      <circle cx="48" cy="48" r="40" fill="transparent" stroke="rgba(255,255,255,0.2)" strokeWidth="8" />
-                      <circle cx="48" cy="48" r="40" fill="transparent" stroke="white" strokeWidth="8" 
-                              strokeDasharray={2 * Math.PI * 40} 
-                              strokeDashoffset={2 * Math.PI * 40 * (1 - slaRate / 100)}
-                              strokeLinecap="round" />
-                    </svg>
-                    <span className="absolute text-xl font-bold">{slaRate}%</span>
-                  </div>
-                  <p className="text-xs font-semibold mt-3 text-center uppercase tracking-wider">Traitées dans les délais</p>
+            {/* Délai moyen + Objectifs */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="card flex items-center gap-4 p-5">
+                <div className="p-3 bg-cnps-50 text-cnps-700 rounded-2xl shrink-0">
+                  <Clock className="w-6 h-6" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Délai moyen de traitement</p>
+                  <p className="text-2xl font-black text-slate-800">
+                    {avgResolutionDays !== null && avgResolutionDays !== undefined ? `${avgResolutionDays} jours` : '—'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="card flex items-center gap-5 p-5">
+                <div className="relative w-20 h-20 shrink-0 flex items-center justify-center">
+                  <svg className="w-full h-full transform -rotate-90">
+                    <circle cx="40" cy="40" r="33" fill="transparent" stroke="#e2e8f0" strokeWidth="7" />
+                    <circle cx="40" cy="40" r="33" fill="transparent" stroke="#10b981" strokeWidth="7"
+                            strokeDasharray={2 * Math.PI * 33}
+                            strokeDashoffset={2 * Math.PI * 33 * (1 - treatedRate / 100)}
+                            strokeLinecap="round" />
+                  </svg>
+                  <span className="absolute text-lg font-black text-slate-800">{treatedRate}%</span>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-700 uppercase tracking-wide">Réclamations traitées</p>
+                  <p className="text-[11px] text-slate-400 font-semibold mt-1">Objectif : {objectifTraitement}%</p>
+                  <p className={clsx("text-[11px] font-black mt-0.5", ecartTraitement >= 0 ? "text-emerald-600" : "text-red-500")}>
+                    Écart : {ecartTraitement >= 0 ? '+' : ''}{ecartTraitement}%
+                  </p>
+                </div>
+              </div>
+
+              <div className="card flex items-center gap-5 p-5">
+                <div className="relative w-20 h-20 shrink-0 flex items-center justify-center">
+                  <svg className="w-full h-full transform -rotate-90">
+                    <circle cx="40" cy="40" r="33" fill="transparent" stroke="#e2e8f0" strokeWidth="7" />
+                    <circle cx="40" cy="40" r="33" fill="transparent" stroke="#10b981" strokeWidth="7"
+                            strokeDasharray={2 * Math.PI * 33}
+                            strokeDashoffset={2 * Math.PI * 33 * (1 - slaRate / 100)}
+                            strokeLinecap="round" />
+                  </svg>
+                  <span className="absolute text-lg font-black text-slate-800">{slaRate}%</span>
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-700 uppercase tracking-wide">Traitées dans les délais</p>
+                  <p className="text-[11px] text-slate-400 font-semibold mt-1">Objectif : {objectifDelai}%</p>
+                  <p className={clsx("text-[11px] font-black mt-0.5", ecartDelai >= 0 ? "text-emerald-600" : "text-red-500")}>
+                    Écart : {ecartDelai >= 0 ? '+' : ''}{ecartDelai}%
+                  </p>
                 </div>
               </div>
             </div>
@@ -589,10 +802,25 @@ export default function Dashboard() {
                           ))}
                         </Pie>
                         <RechartsTooltip />
-                        <Legend verticalAlign="bottom" height={36}/>
                       </RePieChart>
                     </ResponsiveContainer>
                   </div>
+                  <ul className="mt-2 space-y-1.5">
+                    {(() => {
+                      const saisineTotal = (stats?.saisine || []).reduce((acc, s) => acc + parseInt(s.count || 0), 0)
+                      return (stats?.saisine || []).map((s, index) => (
+                        <li key={index} className="flex items-center justify-between text-xs">
+                          <span className="flex items-center gap-2 text-slate-600 font-medium truncate">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                            {s.libelle}
+                          </span>
+                          <span className="font-bold text-slate-800 shrink-0">
+                            {saisineTotal > 0 ? Math.round((s.count / saisineTotal) * 100) : 0}%
+                          </span>
+                        </li>
+                      ))
+                    })()}
+                  </ul>
                 </div>
 
                 {/* Type de client */}
@@ -625,7 +853,12 @@ export default function Dashboard() {
                       <div key={i} className="group">
                         <div className="flex justify-between items-center mb-1">
                           <span className="text-xs font-medium text-slate-700 truncate max-w-[200px]">{m.libelle}</span>
-                          <span className="text-xs font-bold text-slate-900">{m.count}</span>
+                          <span className="text-xs font-bold text-slate-900">
+                            {m.count}
+                            <span className="text-slate-400 font-semibold ml-1">
+                              ({stats?.counters?.total > 0 ? Math.round((m.count / stats.counters.total) * 100) : 0}%)
+                            </span>
+                          </span>
                         </div>
                         <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
                           <div 
@@ -650,10 +883,10 @@ export default function Dashboard() {
             </div>
             <div>
               <h2 className="text-lg font-bold text-slate-800">
-                {filters.queue === 'non_qualifiees' ? 'Réclamations non qualifiées (Portail)' : filters.queue === 'escaladees' ? 'Suivi des réclamations escaladées' : filters.correction === '1' ? 'Dossiers retournés pour correction' : filters.statut ? `Réclamations : ${STATUTS.find(s => s.value === filters.statut)?.label}` : filters.hors_sla ? 'Réclamations Hors Délai' : 'Vue globale des réclamations'}
+                {filters.queue === 'non_qualifiees' ? 'Réclamations non qualifiées (Portail)' : filters.queue === 'escaladees' ? 'Suivi des réclamations escaladées' : filters.correction === '1' ? 'Dossiers retournés pour correction' : filters.statut ? `Réclamations : ${STATUTS.find(s => s.value === filters.statut)?.label}` : filters.hors_sla ? 'Réclamations Hors Délai' : 'Derniers tickets'}
               </h2>
               <p className="text-xs text-slate-400 font-medium">
-                {filters.queue === 'non_qualifiees' ? "Liste des dossiers en attente de qualification par l'Agence Digitale" : filters.queue === 'escaladees' ? 'Liste des dossiers escaladés vers d\'autres structures ou agences' : filters.correction === '1' ? 'Liste des dossiers nécessitant des corrections demandées par la coordination' : 'Affichage de la liste détaillée des dossiers'}
+                {filters.queue === 'non_qualifiees' ? "Liste des dossiers en attente de qualification par l'Agence Digitale" : filters.queue === 'escaladees' ? 'Liste des dossiers escaladés vers d\'autres structures ou agences' : filters.correction === '1' ? 'Liste des dossiers nécessitant des corrections demandées par la coordination' : (filters.statut || filters.hors_sla) ? 'Affichage de la liste détaillée des dossiers' : 'Aperçu des 10 tickets les plus récents — listes complètes via les corbeilles de traitement'}
               </p>
             </div>
           </div>
@@ -673,7 +906,7 @@ export default function Dashboard() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
                     type="text"
-                    placeholder="Rechercher par numéro, partenaire..."
+                    placeholder="Rechercher par numéro, client..."
                     value={filters.q}
                     onChange={e => handleFilter('q', e.target.value)}
                     className="form-input pl-10 border-slate-200"
@@ -737,7 +970,7 @@ export default function Dashboard() {
                 <thead>
                 <tr>
                     <th className="w-24 lg:w-32">N° Ticket</th>
-                    <th>Partenaire</th>
+                    <th>Client</th>
                     <th className="hidden md:table-cell">Processus / Motif</th>
                     <th className="hidden lg:table-cell">Agence</th>
                     <th>Statut</th>
@@ -753,9 +986,9 @@ export default function Dashboard() {
                         key={ticket.id}
                         className={clsx(
                             "cursor-pointer group transition-colors",
-                            ticket.statut === 'a_valider' && user?.role === 'coordonnateur' && "bg-violet-50/50 hover:bg-violet-50",
+                            ticket.statut === 'a_valider' && user?.role === 'manager' && "bg-accent-50/50 hover:bg-accent-50",
                             ticket.statut === 'en_cours' && ticket.remarques_coordination && "bg-amber-50/40 border-l-4 border-l-amber-500 hover:bg-amber-50/80",
-                            ticket.agence_origine_id === ticket.agence_id && ticket.pilote_escaladeur_id && "bg-violet-50/60 border-l-4 border-l-violet-600 hover:bg-violet-100/70"
+                            ticket.agence_origine_id === ticket.agence_id && ticket.pilote_escaladeur_id && "bg-cnps-50/60 border-l-4 border-l-cnps-900 hover:bg-cnps-100/70"
                         )}
                         onClick={() => navigate(`/reclamations/${ticket.id}`)}
                     >
@@ -808,7 +1041,7 @@ export default function Dashboard() {
                                     </span>
                                 )}
                                 {ticket.agence_origine_id === ticket.agence_id && ticket.pilote_escaladeur_id && (
-                                    <span className="text-[9px] text-violet-600 font-black uppercase bg-violet-100 border border-violet-200 rounded px-1.5 py-0.5 w-fit" title="Cette réclamation a été traitée par la structure cible et vous a été retournée.">
+                                    <span className="text-[9px] text-cnps-900 font-black uppercase bg-cnps-100 border border-cnps-200 rounded px-1.5 py-0.5 w-fit" title="Cette réclamation a été traitée par la structure cible et vous a été retournée.">
                                         Retour Escalade
                                     </span>
                                 )}
@@ -838,7 +1071,7 @@ export default function Dashboard() {
                                 </span>
                             )}
                             {ticket.agence_origine_id === ticket.agence_id && ticket.pilote_escaladeur_id && (
-                                <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-[9px] font-black bg-violet-600 text-white animate-pulse mr-2 uppercase tracking-tighter">
+                                <span className="inline-flex items-center gap-1.5 px-2 py-1 rounded text-[9px] font-black bg-cnps-900 text-white animate-pulse mr-2 uppercase tracking-tighter">
                                     Retour Escalade
                                 </span>
                             )}

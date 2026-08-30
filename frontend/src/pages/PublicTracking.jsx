@@ -1,6 +1,6 @@
-import React, { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Search, Clock, CheckCircle, AlertCircle, Calendar, ArrowRight, Building2, FileText, ChevronRight, Share2, RotateCcw } from 'lucide-react'
+import React, { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Search, Clock, CheckCircle, AlertCircle, Calendar, ArrowRight, Building2, FileText, ChevronRight, Share2, RotateCcw, Home } from 'lucide-react'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import { publicApi } from '../api'
@@ -9,25 +9,26 @@ import clsx from 'clsx'
 
 export default function PublicTracking() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [numero, setNumero] = useState('')
   const [results, setResults] = useState([]) // Liste des résultats
   const [ticket, setTicket] = useState(null) // Ticket sélectionné
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  const handleSearch = async (e) => {
-    e.preventDefault()
-    if (!numero.trim()) return
-    
+  const runSearch = async (num) => {
+    const val = (num || '').trim()
+    if (!val) return
+
     setLoading(true)
     setError(null)
     setTicket(null)
     setResults([])
-    
+
     try {
-      const res = await publicApi.track(numero.trim())
+      const res = await publicApi.track(val)
       const data = res.data // C'est un tableau maintenant
-      
+
       if (data.length === 1) {
         setTicket(data[0])
         setResults([data[0]])
@@ -42,11 +43,25 @@ export default function PublicTracking() {
     }
   }
 
+  const handleSearch = (e) => {
+    e.preventDefault()
+    runSearch(numero)
+  }
+
+  // Pré-remplissage et recherche auto quand on arrive depuis le portail (?n=…)
+  useEffect(() => {
+    const n = searchParams.get('n')
+    if (n) {
+      setNumero(n.toUpperCase())
+      runSearch(n)
+    }
+  }, [])
+
   const steps = [
     { key: 'nouveau',   label: 'Réception',     desc: 'Votre réclamation a été bien reçue.' },
-    { key: 'en_cours',  label: 'Traitement',    desc: 'Un pilote analyse votre dossier.' },
-    { key: 'a_valider', label: 'Finalisation',  desc: 'La solution est en cours de validation.' },
-    { key: 'resolu',    label: 'Terminé',       desc: 'Une réponse vous a été apportée.' }
+    { key: 'en_cours',  label: 'Traitement',    desc: 'Votre réclamation en cours de traitement.' },
+    { key: 'a_valider', label: 'Clôture',       desc: 'Le traitement de votre réclamation est en cours de finalisation.' },
+    { key: 'resolu',    label: 'Terminée',      desc: 'Votre réclamation a été traitée. Une réponse vous a été envoyée.' }
   ]
 
   const getCurrentStepIndex = (currentTicket) => {
@@ -62,7 +77,7 @@ export default function PublicTracking() {
     if (navigator.share) {
       try {
         await navigator.share({
-          title: 'eRéclamations - Suivi de dossier',
+          title: 'eRéclamations - Suivi de réclamation',
           text: text,
           url: `${window.location.origin}/tracking?n=${ticket.numero_ticket}`
         })
@@ -88,10 +103,9 @@ export default function PublicTracking() {
               <p className="text-[8px] lg:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Portail Client</p>
             </div>
           </div>
-          <a href="/login" className="text-[10px] lg:text-xs font-black text-cnps-800 uppercase tracking-widest hover:underline flex items-center gap-1 lg:gap-2">
-            <span className="hidden sm:inline">Espace Agent</span>
-            <span className="sm:hidden">Agent</span>
-            <ArrowRight className="w-3 h-3 lg:w-4 lg:h-4" />
+          <a href="/" className="text-[10px] lg:text-xs font-black text-cnps-800 uppercase tracking-widest hover:underline flex items-center gap-1 lg:gap-2">
+            <Home className="w-3 h-3 lg:w-4 lg:h-4" />
+            Accueil
           </a>
         </div>
       </header>
@@ -100,7 +114,7 @@ export default function PublicTracking() {
         <div className="w-full max-w-3xl space-y-8 lg:space-y-12">
           {/* Hero Section */}
           <div className="text-center space-y-3 lg:space-y-4">
-            <h2 className="text-2xl md:text-5xl font-black text-slate-900 tracking-tight leading-tight">Suivez votre dossier <span className="text-cnps-800">en temps réel</span></h2>
+            <h2 className="text-2xl md:text-5xl font-black text-slate-900 tracking-tight leading-tight">Suivez votre réclamation <span className="text-cnps-800">en temps réel</span></h2>
             <p className="text-slate-500 text-sm font-medium max-w-xl mx-auto">Saisissez votre numéro de ticket pour connaître l'avancement de votre réclamation sans vous déplacer.</p>
           </div>
 
@@ -144,7 +158,7 @@ export default function PublicTracking() {
                 </div>
                 <div className="text-left">
                   <p className="text-[10px] lg:text-xs font-black text-slate-900 uppercase tracking-tight">Déclarer une réclamation</p>
-                  <p className="text-[8px] lg:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Enregistrer un nouveau dossier</p>
+                  <p className="text-[8px] lg:text-[10px] font-bold text-slate-400 uppercase tracking-widest">Enregistrer une nouvelle réclamation</p>
                 </div>
               </button>
             </div>
@@ -163,7 +177,7 @@ export default function PublicTracking() {
             <div className="animate-in fade-in slide-in-from-bottom duration-700 space-y-4 lg:space-y-6">
               <div className="text-center space-y-1 lg:space-y-2">
                 <p className="text-[10px] font-black text-cnps-800 uppercase tracking-[0.2em]">Plusieurs résultats trouvés</p>
-                <p className="text-slate-500 text-xs lg:text-sm font-medium">Veuillez sélectionner le dossier que vous souhaitez suivre :</p>
+                <p className="text-slate-500 text-xs lg:text-sm font-medium">Veuillez sélectionner la réclamation que vous souhaitez suivre :</p>
               </div>
               <div className="grid grid-cols-1 gap-3 lg:gap-4">
                 {results.map((r) => (
@@ -204,7 +218,7 @@ export default function PublicTracking() {
               <div className="bg-white rounded-[1.5rem] lg:rounded-[2.5rem] shadow-xl border border-slate-100 overflow-hidden">
                 <div className="bg-cnps-800 p-6 lg:p-8 text-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 lg:gap-6">
                   <div>
-                    <p className="text-[8px] lg:text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">Dossier sélectionné</p>
+                    <p className="text-[8px] lg:text-[10px] font-black uppercase tracking-widest opacity-60 mb-1">Réclamation sélectionnée</p>
                     <h3 className="text-2xl lg:text-3xl font-black">{ticket.numero_ticket}</h3>
                   </div>
                   <div className="bg-white/10 backdrop-blur-md px-4 lg:px-6 py-2 lg:py-3 rounded-xl lg:rounded-2xl border border-white/20 w-full sm:w-auto">
@@ -299,7 +313,7 @@ export default function PublicTracking() {
                         <CheckCircle className="w-5 h-5 lg:w-6 lg:h-6" />
                       </div>
                       <div>
-                        <h4 className="text-[10px] lg:text-sm font-black text-green-800 uppercase tracking-tight">Dossier Traité</h4>
+                        <h4 className="text-[10px] lg:text-sm font-black text-green-800 uppercase tracking-tight">Réclamation traitée</h4>
                         <p className="text-[9px] lg:text-xs text-green-700 font-medium">Une solution a été apportée à votre réclamation. Consultez vos emails ou contactez votre agence.</p>
                       </div>
                     </div>
@@ -311,7 +325,7 @@ export default function PublicTracking() {
                         <AlertCircle className="w-5 h-5 lg:w-6 lg:h-6" />
                       </div>
                       <div>
-                        <h4 className="text-[10px] lg:text-sm font-black text-slate-800 uppercase tracking-tight">Dossier Clôturé</h4>
+                        <h4 className="text-[10px] lg:text-sm font-black text-slate-800 uppercase tracking-tight">Réclamation clôturée</h4>
                         <p className="text-[9px] lg:text-xs text-slate-600 font-medium">Votre demande a été traitée et clôturée. Pour plus de précisions, contactez l'agence {ticket.agence}.</p>
                       </div>
                     </div>

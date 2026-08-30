@@ -37,7 +37,7 @@ const Infographie = () => {
             eRéclamations <span className="text-cnps-200">CNPS</span>
           </h1>
           <p className="text-xl text-cnps-50 max-w-3xl mx-auto mb-10 leading-relaxed">
-            Une plateforme complète pour centraliser le pilotage des réclamations, automatiser les notifications, offrir un portail de suivi aux partenaires et générer vos courriers officiels en un clic.
+            Une plateforme complète pour centraliser le pilotage des réclamations, automatiser les notifications, offrir un portail de suivi aux clients et générer vos courriers officiels en un clic.
           </p>
           <div className="flex flex-wrap justify-center gap-4">
             <Link to="/" className="px-8 py-4 bg-white text-cnps-800 font-bold rounded-xl shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300">
@@ -62,7 +62,7 @@ const Infographie = () => {
             {
               icon: <Globe className="w-8 h-8 text-indigo-600" />,
               title: "Portail Client (Suivi)",
-              desc: "Les partenaires peuvent désormais suivre l'avancement de leurs dossiers en ligne 24h/24 via leur numéro de ticket."
+              desc: "Les clients peuvent désormais suivre l'avancement de leurs dossiers en ligne 24h/24 via leur numéro de ticket."
             },
             {
               icon: <Mail className="w-8 h-8 text-blue-500" />,
@@ -141,7 +141,7 @@ const Infographie = () => {
             <div className="space-y-6">
               {[
                 { title: "Réduction des délais de 40%", desc: "L'automatisation et le suivi SLA éliminent les temps morts dans le traitement.", icon: <TrendingUp className="text-green-500" /> },
-                { title: "Transparence Totale", desc: "Le partenaire et l'administration peuvent suivre l'avancement en temps réel.", icon: <Users className="text-blue-500" /> },
+                { title: "Transparence Totale", desc: "Le client et l'administration peuvent suivre l'avancement en temps réel.", icon: <Users className="text-blue-500" /> },
                 { title: "Décisions Basées sur la Donnée", icon: <BarChart3 className="text-purple-500" />, desc: "Analyses comparatives entre agences pour identifier les points d'amélioration." }
               ].map((benefit, i) => (
                 <div key={i} className="flex gap-4">

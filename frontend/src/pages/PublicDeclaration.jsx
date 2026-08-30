@@ -27,6 +27,7 @@ export default function PublicDeclaration() {
     regime_id: '',
     type_client_id: '',
     partenaire_identifiant: '',
+    partenaire_immatricule: true,
     partenaire_nom_prenoms: '',
     partenaire_sexe: 'M',
     partenaire_telephone: '',
@@ -89,6 +90,58 @@ export default function PublicDeclaration() {
 
   const handleChange = (key, val) => setForm(f => ({ ...f, [key]: val }))
 
+  useEffect(() => {
+    if (!form.partenaire_immatricule) {
+      setForm(f => ({ ...f, partenaire_identifiant: '' }))
+    }
+  }, [form.partenaire_immatricule])
+
+  const selectedRegime = regimes.find(r => r.id == form.regime_id)
+  const selectedTypeClient = typesClients.find(t => t.id == form.type_client_id)
+  const typeLibelle = (selectedTypeClient?.libelle || '').toLowerCase()
+  const isEmployeurType = typeLibelle.includes('employeur')
+  const isTravailleurSalarie = typeLibelle.includes('salari')
+  const isTravailleurIndependant = typeLibelle.includes('pendant') // "indépendant"
+  const isTravailleur = isTravailleurSalarie || isTravailleurIndependant
+  const isRegimeGeneral = selectedRegime ? (selectedRegime.has_employeur ?? true) : true
+  // Le Numéro CNPS n'est obligatoire que pour un travailleur (salarié/indépendant) immatriculé.
+  const identifiantRequis = form.partenaire_immatricule && isTravailleur
+
+  // Reinitialise les champs d'identité/employeur selon le type choisi
+  useEffect(() => {
+    setForm(f => ({
+      ...f,
+      partenaire_raison_sociale: isEmployeurType ? f.partenaire_raison_sociale : '',
+      partenaire_nom_prenoms:    isEmployeurType ? '' : f.partenaire_nom_prenoms,
+      partenaire_employeur:      isTravailleurSalarie ? f.partenaire_employeur : '',
+      // Sexe non pertinent pour un Employeur (personne morale).
+      partenaire_sexe: isEmployeurType ? '' : (f.partenaire_sexe || 'M'),
+    }))
+  }, [form.type_client_id])
+
+  const identifiantFormatHint = isEmployeurType
+    ? 'Entre 1 et 6 chiffres'
+    : isRegimeGeneral
+      ? 'Exactement 12 chiffres (Régime Général)'
+      : 'Exactement 14 chiffres (Travailleur indépendant)'
+
+  const getIdentifiantFormatError = () => {
+    if (!form.partenaire_immatricule) return null
+    const val = (form.partenaire_identifiant || '').trim()
+    if (!val) {
+      return identifiantRequis ? "Le Numéro CNPS est obligatoire pour un travailleur immatriculé." : null
+    }
+    if (!/^\d+$/.test(val)) return "Le Numéro CNPS ne doit contenir que des chiffres."
+    if (isEmployeurType) {
+      if (val.length < 1 || val.length > 6) return "Le Numéro CNPS employeur doit contenir entre 1 et 6 chiffres."
+    } else if (isTravailleur && isRegimeGeneral) {
+      if (val.length !== 12) return "Le Numéro CNPS d'un travailleur du Régime Général doit contenir exactement 12 chiffres."
+    } else if (isTravailleur) {
+      if (val.length !== 14) return "Le Numéro CNPS d'un travailleur indépendant (RSTI) doit contenir exactement 14 chiffres."
+    }
+    return null
+  }
+
   const handleCheckIdentifier = async () => {
     if (!form.partenaire_identifiant) return
     if (!form.type_client_id) {
@@ -130,6 +183,8 @@ export default function PublicDeclaration() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    const idFormatError = getIdentifiantFormatError()
+    if (idFormatError) { swal.warning("Numéro CNPS invalide", idFormatError); return }
     setSaving(true)
     try {
       const formData = new FormData()
@@ -142,7 +197,15 @@ export default function PublicDeclaration() {
 
       const res = await publicApi.declare(formData)
       if (navigator.vibrate) navigator.vibrate([100, 50, 100])
-      await swal.success("Déclaration envoyée", `Votre réclamation a été enregistrée sous le numéro : ${res.numero_ticket}. Conservez précieusement ce numéro pour le suivi.`)
+      const fileErrors = res?.file_errors || []
+      if (fileErrors.length > 0) {
+        await swal.warning(
+          "Déclaration envoyée, mais...",
+          `Votre réclamation a été enregistrée sous le numéro : ${res.numero_ticket}. Certains fichiers n'ont pas pu être joints :\n${fileErrors.join('\n')}`
+        )
+      } else {
+        await swal.success("Déclaration envoyée", `Votre réclamation a été enregistrée sous le numéro : ${res.numero_ticket}. Conservez précieusement ce numéro pour le suivi.`)
+      }
       navigate(`/tracking?numero=${res.numero_ticket}`)
     } catch (err) {
       swal.error("Erreur", err.message)
@@ -257,38 +320,63 @@ export default function PublicDeclaration() {
                       </div>
 
                       <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Numéro CNPS / Identifiant</label>
-                        <div className="flex flex-col sm:flex-row gap-3 lg:gap-4">
-                          <input 
-                            type="text"
-                            value={form.partenaire_identifiant}
-                            onChange={e => handleChange('partenaire_identifiant', e.target.value)}
-                            placeholder="Ex: 123456789"
-                            className="flex-1 px-4 lg:px-6 py-3.5 lg:py-4 rounded-2xl bg-slate-50 border-none focus:ring-2 focus:ring-cnps-800/20 font-bold text-slate-800 placeholder:text-slate-300 transition-all text-sm lg:text-base"
-                          />
-                          <button 
-                            type="button"
-                            onClick={handleCheckIdentifier}
-                            disabled={checkingId || !form.partenaire_identifiant}
-                            className="w-full sm:w-auto px-6 lg:px-8 py-3.5 lg:py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                          >
-                            {checkingId ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
-                            Vérifier
-                          </button>
+                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Êtes-vous immatriculé à la CNPS ? *</label>
+                        <div className="flex gap-3 lg:gap-4 p-1 lg:p-2">
+                          <label className={clsx(
+                            "flex-1 flex items-center justify-center gap-2 py-3 lg:py-4 rounded-2xl font-bold cursor-pointer border-2 transition-all text-sm lg:text-base",
+                            form.partenaire_immatricule === true ? "bg-cnps-50 border-cnps-800 text-cnps-800" : "bg-white border-slate-100 text-slate-400"
+                          )}>
+                            <input type="radio" className="hidden" checked={form.partenaire_immatricule === true} onChange={() => handleChange('partenaire_immatricule', true)} />
+                            Oui
+                          </label>
+                          <label className={clsx(
+                            "flex-1 flex items-center justify-center gap-2 py-3 lg:py-4 rounded-2xl font-bold cursor-pointer border-2 transition-all text-sm lg:text-base",
+                            form.partenaire_immatricule === false ? "bg-cnps-50 border-cnps-800 text-cnps-800" : "bg-white border-slate-100 text-slate-400"
+                          )}>
+                            <input type="radio" className="hidden" checked={form.partenaire_immatricule === false} onChange={() => handleChange('partenaire_immatricule', false)} />
+                            Non
+                          </label>
                         </div>
                       </div>
 
+                      {form.partenaire_immatricule && (
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Numéro CNPS {identifiantRequis ? '*' : <span className="text-slate-300 normal-case">(optionnel)</span>}</label>
+                          <div className="flex flex-col sm:flex-row gap-3 lg:gap-4">
+                            <input
+                              type="text"
+                              value={form.partenaire_identifiant}
+                              onChange={e => handleChange('partenaire_identifiant', e.target.value)}
+                              placeholder="Ex: 123456789012"
+                              className="flex-1 px-4 lg:px-6 py-3.5 lg:py-4 rounded-2xl bg-slate-50 border-none focus:ring-2 focus:ring-cnps-800/20 font-bold text-slate-800 placeholder:text-slate-300 transition-all text-sm lg:text-base"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleCheckIdentifier}
+                              disabled={checkingId || !form.partenaire_identifiant}
+                              className="w-full sm:w-auto px-6 lg:px-8 py-3.5 lg:py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                              {checkingId ? <Loader2 className="w-3 h-3 animate-spin" /> : <Search className="w-3 h-3" />}
+                              Vérifier
+                            </button>
+                          </div>
+                          {form.type_client_id && (
+                            <p className="text-[10px] text-slate-400 font-semibold px-1">{identifiantFormatHint}</p>
+                          )}
+                        </div>
+                      )}
+
                       {/* Display name/raison sociale based on type client or if it was found */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-8">
-                        {form.type_client_id && typesClients.find(t => t.id == form.type_client_id)?.libelle?.toLowerCase()?.includes('entreprise') ? (
+                        {isEmployeurType ? (
                           <div className="space-y-2">
                             <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Raison Sociale *</label>
-                            <input 
+                            <input
                               required
                               type="text"
                               value={form.partenaire_raison_sociale}
                               onChange={e => handleChange('partenaire_raison_sociale', e.target.value)}
-                              placeholder="Nom de l'entreprise"
+                              placeholder="Raison sociale de l'employeur"
                               className="w-full px-4 lg:px-6 py-3.5 lg:py-4 rounded-2xl bg-slate-50 border-none focus:ring-2 focus:ring-cnps-800/20 font-bold text-slate-800 placeholder:text-slate-300 transition-all text-sm lg:text-base"
                             />
                           </div>
@@ -306,37 +394,41 @@ export default function PublicDeclaration() {
                           </div>
                         )}
 
-                        <div className="space-y-2">
-                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Sexe *</label>
-                          <div className="flex gap-3 lg:gap-4 p-1 lg:p-2">
-                            <label className={clsx(
-                              "flex-1 flex items-center justify-center gap-2 py-3 lg:py-4 rounded-2xl font-bold cursor-pointer border-2 transition-all text-sm lg:text-base",
-                              form.partenaire_sexe === 'M' ? "bg-cnps-50 border-cnps-800 text-cnps-800" : "bg-white border-slate-100 text-slate-400"
-                            )}>
-                              <input type="radio" className="hidden" checked={form.partenaire_sexe === 'M'} onChange={() => handleChange('partenaire_sexe', 'M')} />
-                              Masculin
-                            </label>
-                            <label className={clsx(
-                              "flex-1 flex items-center justify-center gap-2 py-3 lg:py-4 rounded-2xl font-bold cursor-pointer border-2 transition-all text-sm lg:text-base",
-                              form.partenaire_sexe === 'F' ? "bg-cnps-50 border-cnps-800 text-cnps-800" : "bg-white border-slate-100 text-slate-400"
-                            )}>
-                              <input type="radio" className="hidden" checked={form.partenaire_sexe === 'F'} onChange={() => handleChange('partenaire_sexe', 'F')} />
-                              Féminin
-                            </label>
+                        {!isEmployeurType && (
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Sexe *</label>
+                            <div className="flex gap-3 lg:gap-4 p-1 lg:p-2">
+                              <label className={clsx(
+                                "flex-1 flex items-center justify-center gap-2 py-3 lg:py-4 rounded-2xl font-bold cursor-pointer border-2 transition-all text-sm lg:text-base",
+                                form.partenaire_sexe === 'M' ? "bg-cnps-50 border-cnps-800 text-cnps-800" : "bg-white border-slate-100 text-slate-400"
+                              )}>
+                                <input type="radio" name="partenaire_sexe" required={!isEmployeurType} className="hidden" checked={form.partenaire_sexe === 'M'} onChange={() => handleChange('partenaire_sexe', 'M')} />
+                                Masculin
+                              </label>
+                              <label className={clsx(
+                                "flex-1 flex items-center justify-center gap-2 py-3 lg:py-4 rounded-2xl font-bold cursor-pointer border-2 transition-all text-sm lg:text-base",
+                                form.partenaire_sexe === 'F' ? "bg-cnps-50 border-cnps-800 text-cnps-800" : "bg-white border-slate-100 text-slate-400"
+                              )}>
+                                <input type="radio" name="partenaire_sexe" required={!isEmployeurType} className="hidden" checked={form.partenaire_sexe === 'F'} onChange={() => handleChange('partenaire_sexe', 'F')} />
+                                Féminin
+                              </label>
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
 
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Nom de l'employeur / Responsable</label>
-                        <input 
-                          type="text"
-                          value={form.partenaire_employeur}
-                          onChange={e => handleChange('partenaire_employeur', e.target.value)}
-                          placeholder="Nom du responsable ou de l'employeur"
-                          className="w-full px-4 lg:px-6 py-3.5 lg:py-4 rounded-2xl bg-slate-50 border-none focus:ring-2 focus:ring-cnps-800/20 font-bold text-slate-800 placeholder:text-slate-300 transition-all text-sm lg:text-base"
-                        />
-                      </div>
+                      {isTravailleurSalarie && (
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Nom de l'employeur</label>
+                          <input
+                            type="text"
+                            value={form.partenaire_employeur}
+                            onChange={e => handleChange('partenaire_employeur', e.target.value)}
+                            placeholder="Nom de l'employeur"
+                            className="w-full px-4 lg:px-6 py-3.5 lg:py-4 rounded-2xl bg-slate-50 border-none focus:ring-2 focus:ring-cnps-800/20 font-bold text-slate-800 placeholder:text-slate-300 transition-all text-sm lg:text-base"
+                          />
+                        </div>
+                      )}
                     </div>
 
                     <hr className="border-slate-100" />
@@ -379,8 +471,11 @@ export default function PublicDeclaration() {
                       <button 
                         type="button"
                         onClick={() => {
-                          if ((form.partenaire_nom_prenoms || form.partenaire_raison_sociale) && form.partenaire_telephone && form.type_client_id) setStep(2)
-                          else swal.warning("Champs requis", "Veuillez renseigner votre type de client, votre nom (ou raison sociale) et votre numéro de téléphone.")
+                          const idFormatError = getIdentifiantFormatError()
+                          if (idFormatError) { swal.warning("Numéro CNPS invalide", idFormatError); return }
+                          const sexeOk = isEmployeurType || !!form.partenaire_sexe
+                          if ((form.partenaire_nom_prenoms || form.partenaire_raison_sociale) && form.partenaire_telephone && form.type_client_id && sexeOk) setStep(2)
+                          else swal.warning("Champs requis", "Veuillez renseigner votre type de client, votre nom (ou raison sociale), votre sexe et votre numéro de téléphone.")
                         }}
                         className="w-full sm:w-auto bg-cnps-800 text-white px-8 lg:px-12 py-4 lg:py-5 rounded-2xl font-black uppercase text-[10px] lg:text-xs tracking-widest hover:bg-cnps-900 transition-all shadow-xl shadow-cnps-200"
                       >

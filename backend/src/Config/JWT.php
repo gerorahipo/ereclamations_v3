@@ -69,6 +69,13 @@ class JWT
             return substr($authHeader, 7);
         }
 
+        // Repli sur un paramètre d'URL (?token=...) : nécessaire pour les liens de
+        // téléchargement de pièces jointes ouverts directement par le navigateur
+        // (une navigation <a href> ne peut pas envoyer d'en-tête Authorization).
+        if (!empty($_GET['token']) && is_string($_GET['token'])) {
+            return $_GET['token'];
+        }
+
         return null;
     }
 

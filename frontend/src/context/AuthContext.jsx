@@ -80,9 +80,12 @@ export function AuthProvider({ children }) {
   const hasRole  = (roles) => roles.includes(user?.role)
   const isAgent  = () => user?.role === 'agent'
   const isPilote = () => user?.role === 'pilote'
-  const isCoord  = () => user?.role === 'coordonnateur'
+  const isCoord  = () => user?.role === 'coordonnateur'            // Coordonnateur (structure centrale, analyse)
+  const isManager = () => user?.role === 'manager'                 // Manager de service/section accueil réclamations
   const isSuper  = () => user?.role === 'superviseur'
-  const isAdmin  = () => user?.role === 'administrateur'
+  const isAdminFonctionnel = () => user?.role === 'administrateur_fonctionnel'
+  const isAdminSysteme     = () => user?.role === 'administrateur_systeme'
+  const isAdmin  = () => user?.role === 'administrateur_fonctionnel' || user?.role === 'administrateur_systeme'
   const isCentrale = () => user?.agence_type === 'centrale'
   
   const currentAgence = authorizedAgencies.find(a => a.agence_id == currentAgenceId) || {}
@@ -92,7 +95,7 @@ export function AuthProvider({ children }) {
       user, token, loading,
       currentAgenceId, currentAgence, authorizedAgencies, switchAgence,
       login, logout,
-      hasRole, isAgent, isPilote, isCoord, isSuper, isAdmin, isCentrale,
+      hasRole, isAgent, isPilote, isCoord, isManager, isSuper, isAdmin, isAdminFonctionnel, isAdminSysteme, isCentrale,
     }}>
       {children}
     </AuthContext.Provider>

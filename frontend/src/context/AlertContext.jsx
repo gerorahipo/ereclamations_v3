@@ -31,7 +31,7 @@ export function AlertProvider({ children }) {
               <div className={`w-20 h-20 rounded-2xl flex items-center justify-center mb-6 ${
                 alert.type === 'success' ? 'bg-green-50 text-green-500' :
                 alert.type === 'error' ? 'bg-red-50 text-red-500' :
-                alert.type === 'warning' ? 'bg-amber-50 text-amber-500' :
+                alert.type === 'warning' ? 'bg-accent-50 text-accent-500' :
                 'bg-cnps-50 text-cnps-500'
               }`}>
                 {alert.type === 'success' && <CheckCircle2 className="w-10 h-10" />}
@@ -60,7 +60,7 @@ export function AlertProvider({ children }) {
                   onClick={() => hideAlert(true)}
                   className={`flex-1 py-4 px-6 rounded-2xl text-sm font-black text-white shadow-lg shadow-cnps-200 transition-all active:scale-95 ${
                     alert.type === 'error' ? 'bg-red-500 hover:bg-red-600 shadow-red-100' :
-                    alert.type === 'warning' ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-100' :
+                    alert.type === 'warning' ? 'bg-accent-500 hover:bg-accent-600 shadow-accent-100' :
                     'bg-cnps-800 hover:bg-cnps-900'
                   }`}
                 >

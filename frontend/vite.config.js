@@ -10,6 +10,13 @@ export default defineConfig({
       includeAssets: ['favicon.ico', 'logo-cnps.png'],
       workbox: {
         cleanupOutdatedCaches: true,
+        navigateFallbackDenylist: [/^\/api\//],
+        runtimeCaching: [
+          {
+            urlPattern: /^\/api\//,
+            handler: 'NetworkOnly',
+          },
+        ],
       },
       manifest: {
         name: 'eRéclamations CNPS',
@@ -46,7 +53,7 @@ export default defineConfig({
     },
     proxy: {
       '/api': {
-        target: process.env.VITE_API_URL || 'http://localhost:81',
+        target: process.env.VITE_API_URL || 'http://localhost:8888',
         changeOrigin: true,
       },
     },

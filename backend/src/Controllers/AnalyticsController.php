@@ -12,7 +12,7 @@ class AnalyticsController {
      */
     public function getComparativeStats(): void
     {
-        Auth::requireRole(['administrateur', 'superviseur']);
+        Auth::requireRole(['administrateur_fonctionnel', 'coordonnateur']);
         $db = Database::getConnection();
 
         // 1. Performance par agence

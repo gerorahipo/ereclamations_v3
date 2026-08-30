@@ -48,10 +48,10 @@ INSERT INTO ressources (matricule, nom, prenoms, agence_id) VALUES
 -- Hash : $2y$10$YyFv8CKTXAI3ZDBUkYs5Pea6eRxY/0sN0QNECVyoMQFfksImVvCGe
 INSERT INTO utilisateurs (ressource_id, email, password, role) VALUES
     (1, 'superviseur@cnps.ci',    '$2y$10$YyFv8CKTXAI3ZDBUkYs5Pea6eRxY/0sN0QNECVyoMQFfksImVvCGe', 'superviseur'),
-    (2, 'coordonnateur@cnps.ci',  '$2y$10$YyFv8CKTXAI3ZDBUkYs5Pea6eRxY/0sN0QNECVyoMQFfksImVvCGe', 'coordonnateur'),
+    (2, 'manager@cnps.ci',        '$2y$10$YyFv8CKTXAI3ZDBUkYs5Pea6eRxY/0sN0QNECVyoMQFfksImVvCGe', 'manager'),
     (3, 'pilote.plateau@cnps.ci', '$2y$10$YyFv8CKTXAI3ZDBUkYs5Pea6eRxY/0sN0QNECVyoMQFfksImVvCGe', 'pilote'),
     (4, 'agent.plateau@cnps.ci',  '$2y$10$YyFv8CKTXAI3ZDBUkYs5Pea6eRxY/0sN0QNECVyoMQFfksImVvCGe', 'agent'),
-    (5, 'coord.plateau@cnps.ci',  '$2y$10$YyFv8CKTXAI3ZDBUkYs5Pea6eRxY/0sN0QNECVyoMQFfksImVvCGe', 'coordonnateur'),
+    (5, 'manager.plateau@cnps.ci','$2y$10$YyFv8CKTXAI3ZDBUkYs5Pea6eRxY/0sN0QNECVyoMQFfksImVvCGe', 'manager'),
     (6, 'pilote.marcory@cnps.ci', '$2y$10$YyFv8CKTXAI3ZDBUkYs5Pea6eRxY/0sN0QNECVyoMQFfksImVvCGe', 'pilote'),
     (7, 'agent.marcory@cnps.ci',  '$2y$10$YyFv8CKTXAI3ZDBUkYs5Pea6eRxY/0sN0QNECVyoMQFfksImVvCGe', 'agent'),
     (8, 'agent.yopougon@cnps.ci', '$2y$10$YyFv8CKTXAI3ZDBUkYs5Pea6eRxY/0sN0QNECVyoMQFfksImVvCGe', 'agent'),

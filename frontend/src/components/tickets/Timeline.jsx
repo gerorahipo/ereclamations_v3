@@ -8,16 +8,16 @@ import {
 import Modal from '../ui/Modal.jsx'
 
 const ACTION_CONFIG = {
-  creation:             { icon: Plus,           color: 'bg-blue-100 text-blue-600',   label: 'Création' },
-  affectation:          { icon: UserCheck,      color: 'bg-indigo-100 text-indigo-600', label: 'Affectation' },
-  prise_en_charge:      { icon: Zap,            color: 'bg-orange-100 text-orange-600', label: 'Prise en charge' },
-  soumission_validation:{ icon: Clock,          color: 'bg-violet-100 text-violet-600', label: 'Soumis à validation' },
-  validation:           { icon: CheckCircle2,   color: 'bg-green-100 text-green-600', label: 'Validé' },
+  creation:             { icon: Plus,           color: 'bg-cnps-100 text-cnps-800',   label: 'Création' },
+  affectation:          { icon: UserCheck,      color: 'bg-cnps-100 text-cnps-800',   label: 'Affectation' },
+  prise_en_charge:      { icon: Zap,            color: 'bg-accent-100 text-accent-700', label: 'Prise en charge' },
+  soumission_validation:{ icon: Clock,          color: 'bg-accent-100 text-accent-700', label: 'Soumis à validation' },
+  validation:           { icon: CheckCircle2,   color: 'bg-emerald-100 text-emerald-700', label: 'Validé' },
   retour_pilote:        { icon: RotateCcw,      color: 'bg-red-100 text-red-600',     label: 'Retourné au pilote' },
-  resolution:           { icon: CheckCircle2,   color: 'bg-green-100 text-green-600', label: 'Résolu' },
+  resolution:           { icon: CheckCircle2,   color: 'bg-emerald-100 text-emerald-700', label: 'Résolu' },
   commentaire:          { icon: MessageSquare,  color: 'bg-slate-100 text-slate-600', label: 'Commentaire' },
-  action_ajoutee:       { icon: Plus,           color: 'bg-cyan-100 text-cyan-600',   label: 'Action ajoutée' },
-  analyse:              { icon: Info,           color: 'bg-indigo-100 text-indigo-600', label: 'Analyse' },
+  action_ajoutee:       { icon: Plus,           color: 'bg-cnps-100 text-cnps-800',   label: 'Action ajoutée' },
+  analyse:              { icon: Info,           color: 'bg-cnps-100 text-cnps-800',   label: 'Analyse' },
 }
 
 export default function Timeline({ historique = [] }) {
@@ -66,7 +66,7 @@ export default function Timeline({ historique = [] }) {
                       }
                       setSelectedDetails(meta)
                     }}
-                    className="text-indigo-600 hover:text-indigo-800 flex items-center gap-1 text-[10px] font-bold"
+                    className="text-cnps-800 hover:text-cnps-900 flex items-center gap-1 text-[10px] font-bold"
                   >
                     <Eye className="w-3 h-3" />
                     Plus

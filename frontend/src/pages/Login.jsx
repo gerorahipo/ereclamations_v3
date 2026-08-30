@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ShieldCheck, Eye, EyeOff, Loader2 } from 'lucide-react'
+import { ArrowLeft, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext.jsx'
 
 export default function Login() {
@@ -38,13 +38,13 @@ export default function Login() {
               <p className="text-sm text-slate-600 leading-relaxed max-w-sm mx-auto">
                 Plateforme centralisée de gestion des réclamations de la Caisse Nationale de Prévoyance Sociale. Connectez-vous pour traiter vos dossiers.
               </p>
-              <div className="mt-6 w-full">
-                <a 
-                  href="/suivi" 
-                  className="inline-flex items-center justify-center gap-2 w-full bg-slate-50 border border-slate-200 text-slate-700 px-4 py-3 rounded-xl text-sm font-bold hover:bg-slate-100 transition-all shadow-sm"
+              <div className="mt-5 w-full">
+                <a
+                  href="/"
+                  className="inline-flex items-center justify-center gap-2 text-sm font-semibold text-slate-500 hover:text-cnps-800 transition-colors"
                 >
-                  <ShieldCheck className="w-4 h-4 text-cnps-800" />
-                  Vous êtes un client ? Suivre mon dossier
+                  <ArrowLeft className="w-4 h-4" />
+                  Retour à l'accueil (espace assuré)
                 </a>
               </div>
             </header>

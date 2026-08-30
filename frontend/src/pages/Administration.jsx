@@ -1,45 +1,53 @@
 import React, { useState, useEffect, useRef } from 'react'
 import {
   Settings, Users, Building2, List, Plus,
-  Loader2, ChevronRight, ChevronLeft, Tag, ShieldCheck, MapPin, X, Save, Edit2, AlertCircle, FileUp, CheckCircle2, Download, Search, UserPlus, Trash2, User, Key, Lock, History, Mail
+  Loader2, ChevronRight, ChevronLeft, Tag, ShieldCheck, MapPin, X, Save, Edit2, AlertCircle, FileUp, CheckCircle2, Download, Search, UserPlus, Trash2, User, Key, Lock, History, Mail, Target
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
-import { authApi, parametrageApi, knowledgeBaseApi, mailApi } from '../api/index.js'
+import { authApi, parametrageApi, knowledgeBaseApi, mailApi, objectifsApi } from '../api/index.js'
 import { useAuth } from '../context/AuthContext.jsx'
 import { useAlert } from '../context/AlertContext.jsx'
 
 const TABS = [
-  { id: 'utilisateurs', label: 'Utilisateurs',      icon: Users, roles: ['superviseur', 'coordonnateur', 'administrateur'] },
-  { id: 'agences',      label: 'Agences',           icon: Building2, roles: ['administrateur'] },
-  { id: 'processus',    label: 'Processus',         icon: List, roles: ['superviseur', 'coordonnateur', 'administrateur'] },
-  { id: 'motifs',       label: 'Motifs & Échéances', icon: Tag, roles: ['superviseur', 'coordonnateur', 'administrateur'] },
-  { id: 'causes',       label: 'Causes (Analyse)',  icon: AlertCircle, roles: ['superviseur', 'coordonnateur', 'administrateur'] },
-  { id: 'modes_saisine', label: 'Modes de Saisine', icon: Settings, roles: ['superviseur', 'coordonnateur', 'administrateur'] },
-  { id: 'regimes',      label: 'Régimes & Clients', icon: ShieldCheck, roles: ['superviseur', 'coordonnateur', 'administrateur'] },
-  { id: 'affectations', label: 'Affectations Auto', icon: MapPin, roles: ['superviseur', 'coordonnateur', 'administrateur'] },
-  { id: 'ressources',   label: 'Personnel',          icon: UserPlus, roles: ['administrateur'] },
-  { id: 'travailleurs', label: 'Travailleurs',  icon: Users, roles: ['superviseur', 'administrateur'] },
-  { id: 'employeurs',   label: 'Employeurs',    icon: Building2, roles: ['superviseur', 'administrateur'] },
-  { id: 'sinistres',    label: 'Sinistres',     icon: AlertCircle, roles: ['superviseur', 'administrateur'] },
-    { id: 'interims',     label: 'Gestion Intérims',   icon: ShieldCheck, roles: ['administrateur'] },
-  { id: 'audit',        label: 'Audit & Logs',      icon: History, roles: ['administrateur'] },
-  { id: 'notifications', label: 'Notifications Email', icon: Mail, roles: ['administrateur'] },
-  { id: 'profil',       label: 'Mon Profil',        icon: User, roles: ['agent', 'pilote', 'superviseur', 'coordonnateur', 'administrateur'] },
+  // Domaine SYSTÈME (administrateur_systeme)
+  { id: 'utilisateurs', label: 'Utilisateurs',      icon: Users, roles: ['administrateur_systeme'] },
+  { id: 'agences',      label: 'Agences',           icon: Building2, roles: ['administrateur_systeme'] },
+  { id: 'ressources',   label: 'Personnel',          icon: UserPlus, roles: ['administrateur_systeme'] },
+  { id: 'notifications', label: 'Notifications Email', icon: Mail, roles: ['administrateur_systeme'] },
+  { id: 'audit',        label: 'Audit & Logs',      icon: History, roles: ['administrateur_systeme'] },
+  { id: 'travailleurs', label: 'Travailleurs',  icon: Users, roles: ['administrateur_systeme'] },
+  { id: 'employeurs',   label: 'Employeurs',    icon: Building2, roles: ['administrateur_systeme'] },
+  { id: 'sinistres',    label: 'Sinistres',     icon: AlertCircle, roles: ['administrateur_systeme'] },
+  // Domaine FONCTIONNEL (administrateur_fonctionnel + superviseur)
+  { id: 'processus',    label: 'Processus',         icon: List, roles: ['administrateur_fonctionnel'] },
+  { id: 'motifs',       label: 'Motifs & Échéances', icon: Tag, roles: ['administrateur_fonctionnel'] },
+  { id: 'causes',       label: 'Causes (Analyse)',  icon: AlertCircle, roles: ['administrateur_fonctionnel'] },
+  { id: 'modes_saisine', label: 'Modes de Saisine', icon: Settings, roles: ['administrateur_fonctionnel'] },
+  { id: 'regimes',      label: 'Régimes & Clients', icon: ShieldCheck, roles: ['administrateur_fonctionnel'] },
+  { id: 'affectations', label: 'Affectations Auto', icon: MapPin, roles: ['administrateur_fonctionnel'] },
+  { id: 'interims',     label: 'Gestion Intérims',   icon: ShieldCheck, roles: ['administrateur_fonctionnel'] },
+  { id: 'objectifs',    label: 'Objectifs SLA',      icon: Target, roles: ['administrateur_fonctionnel'] },
+  // Accessible à tous
+  { id: 'profil',       label: 'Mon Profil',        icon: User, roles: ['agent', 'pilote', 'coordonnateur', 'manager', 'superviseur', 'administrateur_fonctionnel', 'administrateur_systeme'] },
 ]
 
 const ROLE_LABELS = {
-  agent:         'Agent',
+  agent:         'Agent accueil et relations client',
   pilote:        'Pilote',
-  coordonnateur: 'Manager de service/section accueil réclamations',
+  coordonnateur: 'Coordonnateur (structure centrale)',
+  manager:       'Manager de service/section accueil réclamations',
   superviseur:   'Superviseur',
-  administrateur: 'Administrateur',
+  administrateur_fonctionnel: 'Administrateur fonctionnel',
+  administrateur_systeme:     'Administrateur système',
 }
 const ROLE_COLORS = {
   agent:         'bg-slate-100 text-slate-700',
   pilote:        'bg-blue-100 text-blue-700',
-  coordonnateur: 'bg-indigo-100 text-indigo-700',
+  coordonnateur: 'bg-teal-100 text-teal-700',
+  manager:       'bg-indigo-100 text-indigo-700',
   superviseur:   'bg-purple-100 text-purple-700',
-  administrateur: 'bg-cnps-800 text-white',
+  administrateur_fonctionnel: 'bg-cnps-700 text-white',
+  administrateur_systeme:     'bg-cnps-900 text-white',
 }
 
 const AUDIT_ACTION_COLORS = {
@@ -53,14 +61,18 @@ const AUDIT_ACTION_COLORS = {
 }
 
 export default function Administration() {
-  const { user, hasRole, isAdmin: checkAdmin, currentAgenceId } = useAuth()
+  const { user, hasRole, isAdmin: checkAdmin, isAdminFonctionnel, isAdminSysteme, currentAgenceId } = useAuth()
   const isAdmin = checkAdmin()
-  const canManage = isAdmin
-  const canDeleteUsers = isAdmin
+  // Peut gérer le paramétrage visible dans son onglet (la visibilité des onglets
+  // est déjà filtrée par rôle plus bas via visibleTabs, et le backend fait foi).
+  const canManage = hasRole(['administrateur_fonctionnel', 'administrateur_systeme'])
+  const canDeleteUsers = isAdminSysteme()
   const swal = useAlert()
   const fileInputRef = useRef(null)
 
-  const initialTab = hasRole(['superviseur', 'coordonnateur', 'administrateur']) ? 'processus' : 'profil'
+  const initialTab = isAdminFonctionnel() ? 'processus'
+                   : isAdminSysteme() ? 'utilisateurs'
+                   : 'profil'
   const [tab, setTab] = useState(initialTab)
 
   const [data, setData] = useState([]) 
@@ -125,6 +137,8 @@ export default function Administration() {
   const [formModeSaisine, setFormModeSaisine] = useState({ libelle: '' })
   const [formSuggestion, setFormSuggestion]   = useState({ motif_id: '', cause_id: '', titre: '', contenu: '', actif: true })
   const [formMail, setFormMail] = useState({ host: '', port: 587, username: '', password: '', encryption: 'tls', from_email: '', from_name: '', is_active: true })
+  const [formObjectifs, setFormObjectifs] = useState({ objectif_traitement_pct: 90, objectif_delai_pct: 90 })
+  const [savingObjectifs, setSavingObjectifs] = useState(false)
   const [formTravailleur, setFormTravailleur] = useState({ numero_cnps: '', nom: '', prenoms: '', telephone: '', email: '' })
   const [formEmployeur, setFormEmployeur] = useState({ numero_cnps: '', raison_sociale: '', nom_employeur: '', telephone: '', email: '' })
   const [formSinistre, setFormSinistre] = useState({ numero_sinistre: '', nom: '', prenoms: '', telephone: '', email: '' })
@@ -235,6 +249,13 @@ export default function Administration() {
           const res = await mailApi.get()
           if (res?.data) setFormMail(res.data)
         }
+        if (tab === 'objectifs') {
+          const res = await objectifsApi.get()
+          if (res?.data) setFormObjectifs({
+            objectif_traitement_pct: parseFloat(res.data.objectif_traitement_pct),
+            objectif_delai_pct: parseFloat(res.data.objectif_delai_pct),
+          })
+        }
       }
     } catch (e) { 
       console.error(e)
@@ -265,7 +286,7 @@ export default function Administration() {
     setFormEmployeur({ numero_cnps: '', raison_sociale: '', nom_employeur: '', telephone: '', email: '' })
     setFormSinistre({ numero_sinistre: '', nom: '', prenoms: '', telephone: '', email: '' })
     if (target === 'interims' || tab === 'interims') {
-      parametrageApi.utilisateurs({ role: 'superviseur,coordonnateur' }).then(u => setUsersList(u?.data || []))
+      parametrageApi.utilisateurs({ role: 'superviseur,manager' }).then(u => setUsersList(u?.data || []))
       parametrageApi.agences().then(a => setAgencesList(a?.data || []))
     }
     if (target === 'affectations' || tab === 'affectations') {
@@ -368,6 +389,19 @@ export default function Administration() {
       swal.error("Erreur", err.message || "Impossible d'enregistrer la configuration.")
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleSaveObjectifs = async (e) => {
+    e.preventDefault()
+    try {
+      setSavingObjectifs(true)
+      await objectifsApi.save(formObjectifs)
+      swal.success("Succès", "Les objectifs du tableau de bord ont été mis à jour.")
+    } catch (err) {
+      swal.error("Erreur", err.message || "Impossible d'enregistrer les objectifs.")
+    } finally {
+      setSavingObjectifs(false)
     }
   }
 
@@ -660,13 +694,13 @@ export default function Administration() {
             {canManage && tab === 'motifs' && (
               <div className="flex gap-2">
                 <button onClick={() => handleOpenCreate('motifs')} className="btn-primary !py-3 !px-6 !text-xs font-black shadow-lg flex items-center gap-2"><Plus className="w-4 h-4" /> MOTIF</button>
-                <button onClick={() => handleOpenCreate('sous_motifs')} className="btn-primary !py-3 !px-6 !text-xs font-black shadow-lg flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700"><Plus className="w-4 h-4" /> SOUS-MOTIF</button>
+                <button onClick={() => handleOpenCreate('sous_motifs')} className="btn-primary !py-3 !px-6 !text-xs font-black shadow-lg flex items-center gap-2 bg-cnps-800 hover:bg-cnps-900"><Plus className="w-4 h-4" /> SOUS-MOTIF</button>
               </div>
             )}
             {canManage && tab === 'regimes' && (
               <div className="flex gap-2">
                 <button onClick={() => handleOpenCreate('regime')} className="btn-primary !py-3 !px-6 !text-xs font-black shadow-lg flex items-center gap-2"><Plus className="w-4 h-4" /> RÉGIME</button>
-                <button onClick={() => handleOpenCreate('type_client')} className="btn-primary !py-3 !px-6 !text-xs font-black shadow-lg flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700"><Plus className="w-4 h-4" /> TYPE CLIENT</button>
+                <button onClick={() => handleOpenCreate('type_client')} className="btn-primary !py-3 !px-6 !text-xs font-black shadow-lg flex items-center gap-2 bg-cnps-800 hover:bg-cnps-900"><Plus className="w-4 h-4" /> TYPE CLIENT</button>
               </div>
             )}
             {canManage && tab === 'causes' && (
@@ -812,7 +846,7 @@ export default function Administration() {
                 <tbody>{paginatedData.map(m => (
                   <tr key={m.id} className="hover:bg-slate-50/80 group">
                     <td><span className="font-bold text-xs text-slate-700 bg-slate-100 px-2.5 py-1 rounded-md">{m.regime_libelle || '-'}</span></td>
-                    <td className="text-xs text-indigo-600 font-bold bg-indigo-50 px-2.5 py-1 rounded-md">{m.type_client_libelle || '-'}</td>
+                    <td className="text-xs text-cnps-800 font-bold bg-cnps-50 px-2.5 py-1 rounded-md">{m.type_client_libelle || '-'}</td>
                     <td className="font-bold text-slate-800">{m.libelle}</td>
                     <td>
                       <div className="flex flex-wrap gap-1.5 max-w-md">
@@ -889,7 +923,7 @@ export default function Administration() {
             {tab === 'agences' && Array.isArray(data) && (
               <table className="table-cnps">
                 <thead><tr><th>Code</th><th>Nom</th><th>Type</th><th className="w-24 text-right">Actions</th></tr></thead>
-                <tbody>{paginatedData.map(a => (<tr key={a.id} className="hover:bg-slate-50/80 group"><td><span className="font-mono font-black text-cnps-800 text-xs">{a.code}</span></td><td className="font-bold text-slate-800">{a.nom}</td><td><span className={`badge ${a.type === 'centrale' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>{a.type === 'centrale' ? 'Direction Centrale' : 'Agence'}</span></td><td className="text-right"><div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all"><button onClick={() => handleOpenEdit('agences', a)} className="p-2 text-slate-300 hover:text-cnps-800 hover:bg-cnps-50 rounded-lg"><Edit2 className="w-4 h-4" /></button><button onClick={() => handleDelete('agences', a)} className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button></div></td></tr>))}</tbody>
+                <tbody>{paginatedData.map(a => (<tr key={a.id} className="hover:bg-slate-50/80 group"><td><span className="font-mono font-black text-cnps-800 text-xs">{a.code}</span></td><td className="font-bold text-slate-800">{a.nom}</td><td><span className={`badge ${a.type === 'centrale' ? 'bg-cnps-100 text-cnps-800' : 'bg-slate-100 text-slate-600'}`}>{a.type === 'centrale' ? 'Direction Centrale' : 'Agence'}</span></td><td className="text-right"><div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all"><button onClick={() => handleOpenEdit('agences', a)} className="p-2 text-slate-300 hover:text-cnps-800 hover:bg-cnps-50 rounded-lg"><Edit2 className="w-4 h-4" /></button><button onClick={() => handleDelete('agences', a)} className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button></div></td></tr>))}</tbody>
               </table>
             )}
 
@@ -951,7 +985,7 @@ export default function Administration() {
                     <td><span className={`badge ${i.actif ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{i.actif ? 'Actif' : 'Inactif'}</span></td>
                     <td className="text-right">
                       <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-all">
-                        <button onClick={() => parametrageApi.toggleInterim(i.id).then(() => fetchTab())} className="p-2 text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Lock className="w-4 h-4" /></button>
+                        <button onClick={() => parametrageApi.toggleInterim(i.id).then(() => fetchTab())} className="p-2 text-slate-300 hover:text-cnps-800 hover:bg-cnps-50 rounded-lg"><Lock className="w-4 h-4" /></button>
                         <button onClick={() => handleDelete('interims', i)} className="p-2 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 className="w-4 h-4" /></button>
                       </div>
                     </td>
@@ -960,7 +994,7 @@ export default function Administration() {
               </table>
             )}
 
-            {tab !== 'analytics' && tab !== 'notifications' && tab !== 'audit' && Array.isArray(data) && filteredData.length === 0 && !loading && (
+            {tab !== 'analytics' && tab !== 'notifications' && tab !== 'audit' && tab !== 'objectifs' && Array.isArray(data) && filteredData.length === 0 && !loading && (
               <div className="p-20 text-center">
                 <div className="w-20 h-20 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-6">
                   <AlertCircle className="w-10 h-10 text-slate-300" />
@@ -1082,6 +1116,61 @@ export default function Administration() {
                         >
                           {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                           Enregistrer la configuration
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            )}
+            {tab === 'objectifs' && (
+              <div className="p-8 bg-slate-50/30">
+                <div className="max-w-2xl mx-auto">
+                  <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
+                    <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center gap-3">
+                      <Target className="w-5 h-5 text-cnps-800" />
+                      <h2 className="text-sm font-black text-slate-800 uppercase tracking-tight">Objectifs du tableau de bord</h2>
+                    </div>
+
+                    <form onSubmit={handleSaveObjectifs} className="p-8 space-y-8">
+                      <p className="text-xs text-slate-500 font-medium">
+                        Ces objectifs déterminent l'écart affiché sur le tableau de bord, pour les indicateurs
+                        « Réclamations traitées » et « Traitées dans les délais ». Ils s'appliquent à toutes les agences.
+                      </p>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                          <label className="text-[10px] font-black uppercase text-slate-500 mb-1.5 block">
+                            Objectif — Réclamations traitées (%) *
+                          </label>
+                          <input
+                            type="number" min="0" max="100" step="0.5" required
+                            className="form-input"
+                            value={formObjectifs.objectif_traitement_pct}
+                            onChange={e => setFormObjectifs({ ...formObjectifs, objectif_traitement_pct: e.target.value })}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-black uppercase text-slate-500 mb-1.5 block">
+                            Objectif — Traitées dans les délais (%) *
+                          </label>
+                          <input
+                            type="number" min="0" max="100" step="0.5" required
+                            className="form-input"
+                            value={formObjectifs.objectif_delai_pct}
+                            onChange={e => setFormObjectifs({ ...formObjectifs, objectif_delai_pct: e.target.value })}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end pt-4">
+                        <button
+                          type="submit"
+                          disabled={savingObjectifs}
+                          className="btn-primary !py-4 !px-10 !text-xs font-black uppercase shadow-xl flex items-center gap-3"
+                        >
+                          {savingObjectifs ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                          Enregistrer les objectifs
                         </button>
                       </div>
                     </form>
@@ -1294,7 +1383,7 @@ export default function Administration() {
                     <div>
                       <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 block">Ressource liée (Optionnel)</label>
                       <select 
-                        className="form-select font-bold border-indigo-200 bg-indigo-50/30" 
+                        className="form-select font-bold border-cnps-200 bg-cnps-50/30"
                         value={formUser.ressource_id} 
                         onChange={e => onSelectRessource(e.target.value)}
                       >
@@ -1342,13 +1431,13 @@ export default function Administration() {
                         onChange={(e) => {
                           const role = e.target.value
                           setInterimRoleFilter(role)
-                          const roleParam = role || 'superviseur,coordonnateur'
+                          const roleParam = role || 'superviseur,manager'
                           parametrageApi.utilisateurs({ role: roleParam }).then(u => setUsersList(u?.data || []))
                         }}
                       >
                         <option value="">Tous les profils (Superviseurs & Managers)</option>
                         <option value="superviseur">Superviseurs</option>
-                        <option value="coordonnateur">Managers de Service/Section</option>
+                        <option value="manager">Managers de Service/Section</option>
                       </select>
                     </div>
                     <div>
@@ -1497,7 +1586,7 @@ export default function Administration() {
                   </div>
                 )}
 
-                <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl flex gap-3 text-[11px] text-amber-800 font-bold"><ShieldCheck className="w-5 h-5 shrink-0" /><p>Toute modification est tracée et impactera les formulaires de saisie en temps réel.</p></div>
+                <div className="bg-accent-50 border border-accent-100 p-4 rounded-2xl flex gap-3 text-[11px] text-accent-700 font-bold"><ShieldCheck className="w-5 h-5 shrink-0" /><p>Toute modification est tracée et impactera les formulaires de saisie en temps réel.</p></div>
               </div>
               <div className="px-8 py-6 bg-slate-50/80 border-t border-slate-100 flex justify-end gap-4 mt-auto shrink-0"><button type="button" onClick={() => setShowModal(false)} className="px-6 py-3 text-xs font-black uppercase text-slate-400">Annuler</button><button type="submit" disabled={saving} className="btn-primary !rounded-2xl !py-3 !px-10 !text-xs font-black uppercase shadow-xl flex items-center gap-3">{saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}{editMode ? 'Mettre à jour' : 'Enregistrer'}</button></div>
             </form>

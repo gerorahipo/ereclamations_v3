@@ -33,7 +33,7 @@ class ActionController
 
     public function create(int $recId): void
     {
-        Auth::requireRole(['pilote', 'superviseur']);
+        Auth::requireRole(['pilote']);
 
         $data = json_decode(file_get_contents('php://input'), true);
         $libelle = trim($data['libelle'] ?? '');
@@ -78,7 +78,7 @@ class ActionController
 
     public function update(int $actionId): void
     {
-        Auth::requireRole(['pilote', 'superviseur']);
+        Auth::requireRole(['pilote']);
 
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
@@ -136,7 +136,7 @@ class ActionController
 
     public function delete(int $actionId): void
     {
-        Auth::requireRole(['pilote', 'superviseur']);
+        Auth::requireRole(['pilote']);
         $pdo = Database::getConnection();
         $user = Auth::$user;
 

@@ -10,9 +10,9 @@ import { useAlert } from '../context/AlertContext.jsx'
 import Modal from '../components/ui/Modal.jsx'
 
 export default function KnowledgeBase() {
-  const { user, isAdmin, isSuper } = useAuth()
+  const { user, isAdminFonctionnel, isSuper } = useAuth()
   const swal = useAlert()
-  const canEdit = isAdmin() || isSuper()
+  const canEdit = isAdminFonctionnel() || isSuper()
 
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState([])

@@ -31,6 +31,7 @@ export default function NouvelleReclamation() {
     partenaire_nom_prenoms: '',
     partenaire_raison_sociale: '',
     partenaire_identifiant: '',
+    partenaire_immatricule: true,
     partenaire_sexe: '',
     partenaire_telephone: '',
     partenaire_email: '',
@@ -79,7 +80,7 @@ export default function NouvelleReclamation() {
   // Linked: Motif -> Sous-motifs
   useEffect(() => {
     if (form.motif_id) {
-      parametrageApi.sousMotifs({ motif_id: form.motif_id }).then(setSousMotifs)
+      parametrageApi.sousMotifs({ motif_id: form.motif_id }).then(d => setSousMotifs(d?.data || []))
     } else {
       setSousMotifs([])
     }
@@ -159,21 +160,32 @@ export default function NouvelleReclamation() {
       return;
     }
     if (!form.sous_motif_id) { setError('Veuillez remplir tous les champs obligatoires'); return }
+    const idFormatError = getIdentifiantFormatError()
+    if (idFormatError) { setError(idFormatError); return }
     setSaving(true)
     setError('')
     try {
       const res = await reclamationsApi.create(form)
-      
+
       // Upload des pièces jointes si présentes
+      let uploadErrors = []
       if (selectedFiles.length > 0) {
         const formData = new FormData()
         selectedFiles.forEach(file => {
           formData.append('files[]', file)
         })
-        await attachmentsApi.upload(res.id, formData)
+        const uploadRes = await attachmentsApi.upload(res.id, formData)
+        uploadErrors = uploadRes?.errors || []
       }
 
-      await swal.success("Réclamation créée", "La réclamation a été enregistrée et imputée avec succès.")
+      if (uploadErrors.length > 0) {
+        await swal.warning(
+          "Réclamation créée, mais...",
+          `La réclamation a été enregistrée. Certains fichiers n'ont pas pu être joints :\n${uploadErrors.join('\n')}`
+        )
+      } else {
+        await swal.success("Réclamation créée", "La réclamation a été enregistrée et imputée avec succès.")
+      }
       navigate(`/reclamations/${res.id}`)
     } catch (err) {
       swal.error("Erreur de création", err.message)
@@ -183,18 +195,64 @@ export default function NouvelleReclamation() {
   }
 
   const selectedRegime = regimes.find(r => r.id == form.regime_id)
-  const showEmployeurInfo = selectedRegime ? (selectedRegime.has_employeur ?? true) : true
+  const regimeHasEmployeur = selectedRegime ? (selectedRegime.has_employeur ?? true) : true
+  const selectedTypeClient = typesClients.find(t => t.id == form.type_client_id)
+  const typeLibelle = (selectedTypeClient?.libelle || '').toLowerCase()
+  const isEmployeurType = typeLibelle.includes('employeur')
+  const isTravailleurSalarie = typeLibelle.includes('salari')
+  const isTravailleurIndependant = typeLibelle.includes('pendant') // "indépendant"
+  const isTravailleur = isTravailleurSalarie || isTravailleurIndependant
+  // Le bloc employeur (nom + N° CNPS employeur) n'est demandé que pour le travailleur salarié.
+  const showEmployeurInfo = isTravailleurSalarie
+  // Le Numéro CNPS n'est obligatoire que pour un travailleur (salarié/indépendant) immatriculé.
+  const identifiantRequis = form.partenaire_immatricule && isTravailleur
 
   useEffect(() => {
-    if (!showEmployeurInfo) {
-      setForm(f => ({
-        ...f,
-        partenaire_raison_sociale: '',
-        partenaire_employeur: '',
-        partenaire_employeur_numero_cnps: ''
-      }))
+    setForm(f => ({
+      ...f,
+      // Raison sociale uniquement pour un Employeur ; Nom/Prénoms pour les autres.
+      partenaire_raison_sociale: isEmployeurType ? f.partenaire_raison_sociale : '',
+      partenaire_nom_prenoms:    isEmployeurType ? '' : f.partenaire_nom_prenoms,
+      // Bloc employeur uniquement pour le travailleur salarié.
+      partenaire_employeur:              isTravailleurSalarie ? f.partenaire_employeur : '',
+      partenaire_employeur_numero_cnps:  isTravailleurSalarie ? f.partenaire_employeur_numero_cnps : '',
+      // Sexe non pertinent pour un Employeur (personne morale).
+      partenaire_sexe: isEmployeurType ? '' : f.partenaire_sexe,
+    }))
+  }, [form.type_client_id])
+
+  useEffect(() => {
+    if (!form.partenaire_immatricule) {
+      setForm(f => ({ ...f, partenaire_identifiant: '' }))
     }
-  }, [showEmployeurInfo])
+  }, [form.partenaire_immatricule])
+
+  const identifiantFormatHint = isEmployeurType
+    ? 'Entre 1 et 6 chiffres'
+    : regimeHasEmployeur
+      ? 'Exactement 12 chiffres (Régime Général)'
+      : 'Exactement 14 chiffres (Travailleur indépendant)'
+
+  const getIdentifiantFormatError = () => {
+    if (!form.partenaire_immatricule) return null
+    const val = (form.partenaire_identifiant || '').trim()
+    if (!val) {
+      // Obligatoire uniquement pour un travailleur (salarié / indépendant) ; optionnel pour les autres.
+      return identifiantRequis ? "Le Numéro CNPS est obligatoire pour un travailleur immatriculé." : null
+    }
+    if (!/^\d+$/.test(val)) return "Le Numéro CNPS ne doit contenir que des chiffres."
+    if (isEmployeurType) {
+      if (val.length < 1 || val.length > 6) return "Le Numéro CNPS employeur doit contenir entre 1 et 6 chiffres."
+    } else if (isTravailleur) {
+      if (regimeHasEmployeur) {
+        if (val.length !== 12) return "Le Numéro CNPS d'un travailleur du Régime Général doit contenir exactement 12 chiffres."
+      } else {
+        if (val.length !== 14) return "Le Numéro CNPS d'un travailleur indépendant (RSTI) doit contenir exactement 14 chiffres."
+      }
+    }
+    // Autres types (ayant droit, rentier, retraité) : numéro optionnel, pas de format imposé.
+    return null
+  }
 
   return (
     <div className="max-w-3xl mx-auto pb-12">
@@ -250,67 +308,86 @@ export default function NouvelleReclamation() {
               </div>
             </div>
 
-            {/* Row 1: Identifiant & Check */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+            {/* Row 1: Immatriculation & Identifiant */}
+            <div className="space-y-4">
               <div>
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 block">Identifiant (N° CNPS/N°Sinistre) *</label>
-                <div className="flex gap-2">
+                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 block">Client immatriculé à la CNPS ? *</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-700">
+                    <input type="radio" name="partenaire_immatricule" required checked={form.partenaire_immatricule === true} onChange={() => handleChange('partenaire_immatricule', true)} className="text-cnps-800 focus:ring-cnps-800" /> Oui
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-700">
+                    <input type="radio" name="partenaire_immatricule" required checked={form.partenaire_immatricule === false} onChange={() => handleChange('partenaire_immatricule', false)} className="text-cnps-800 focus:ring-cnps-800" /> Non
+                  </label>
+                </div>
+              </div>
+
+              {form.partenaire_immatricule && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
+                  <div>
+                    <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 block">Numéro CNPS {identifiantRequis ? '*' : <span className="text-slate-300 normal-case">(optionnel)</span>}</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        required={identifiantRequis}
+                        value={form.partenaire_identifiant}
+                        onChange={e => handleChange('partenaire_identifiant', e.target.value)}
+                        className="form-input font-bold flex-1"
+                        placeholder="Ex: 123456789012"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={handleCheckIdentifier}
+                          disabled={checkingId || !form.partenaire_identifiant}
+                          className="btn-secondary !py-2 !px-3"
+                          title="Vérifier l'identité"
+                        >
+                          {checkingId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Tag className="w-4 h-4" />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => fetchClientHistory()}
+                          disabled={checkingId || !form.partenaire_identifiant}
+                          className="btn-secondary !py-2 !px-3"
+                          title="Chercher l'historique de ce client"
+                        >
+                          <History className="w-4 h-4 text-blue-600" />
+                        </button>
+                      </div>
+                    </div>
+                    {form.type_client_id && (
+                      <p className="mt-1.5 text-[10px] text-slate-400 font-semibold">{identifiantFormatHint}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Row 2: Identité — Raison sociale (Employeur) OU Nom et Prénoms (autres) */}
+            <div className="grid grid-cols-1 gap-6">
+              {isEmployeurType ? (
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">Raison sociale *</label>
                   <input
                     type="text"
                     required
-                    value={form.partenaire_identifiant}
-                    onChange={e => handleChange('partenaire_identifiant', e.target.value)}
-                    className="form-input font-bold flex-1"
-                    placeholder="Ex: 123456789"
-                  />
-                  <div className="flex gap-2">
-                    <button 
-                      type="button" 
-                      onClick={handleCheckIdentifier}
-                      disabled={checkingId || !form.partenaire_identifiant}
-                      className="btn-secondary !py-2 !px-3"
-                      title="Vérifier l'identité"
-                    >
-                      {checkingId ? <Loader2 className="w-4 h-4 animate-spin" /> : <Tag className="w-4 h-4" />}
-                    </button>
-                    <button 
-                      type="button" 
-                      onClick={() => fetchClientHistory()}
-                      disabled={checkingId || !form.partenaire_identifiant}
-                      className="btn-secondary !py-2 !px-3"
-                      title="Chercher l'historique de ce client"
-                    >
-                      <History className="w-4 h-4 text-blue-600" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Row 2: Nom/Prénoms & Raison Sociale (RESULT) */}
-            <div className={`grid grid-cols-1 ${showEmployeurInfo ? 'md:grid-cols-2' : ''} gap-6`}>
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">Nom et Prénoms</label>
-                <input
-                  type="text"
-                  value={form.partenaire_nom_prenoms}
-                  onChange={e => handleChange('partenaire_nom_prenoms', e.target.value)}
-                  disabled={!!form.partenaire_raison_sociale}
-                  className="form-input font-bold disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed"
-                  placeholder={form.partenaire_raison_sociale ? "Désactivé (Raison sociale déjà saisie)" : "Saisissez le nom et prénoms..."}
-                />
-              </div>
-              
-              {showEmployeurInfo && (
-                <div>
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">Raison sociale</label>
-                  <input
-                    type="text"
                     value={form.partenaire_raison_sociale}
                     onChange={e => handleChange('partenaire_raison_sociale', e.target.value)}
-                    disabled={!!form.partenaire_nom_prenoms}
-                    className="form-input font-bold disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed"
-                    placeholder={form.partenaire_nom_prenoms ? "Désactivé (Nom/Prénoms déjà saisis)" : "Saisissez la raison sociale..."}
+                    className="form-input font-bold"
+                    placeholder="Raison sociale de l'employeur..."
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1 block">Nom et Prénoms *</label>
+                  <input
+                    type="text"
+                    required
+                    value={form.partenaire_nom_prenoms}
+                    onChange={e => handleChange('partenaire_nom_prenoms', e.target.value)}
+                    className="form-input font-bold"
+                    placeholder="Saisissez le nom et prénoms..."
                   />
                 </div>
               )}
@@ -360,17 +437,19 @@ export default function NouvelleReclamation() {
 
             {/* Row 4: Sexe & Email */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-slate-50/50 rounded-xl border border-slate-100">
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 block">Sexe *</label>
-                <div className="flex gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-700">
-                    <input type="radio" required checked={form.partenaire_sexe === 'M'} onChange={() => handleChange('partenaire_sexe', 'M')} className="text-cnps-800 focus:ring-cnps-800" /> Masculin
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-700">
-                    <input type="radio" required checked={form.partenaire_sexe === 'F'} onChange={() => handleChange('partenaire_sexe', 'F')} className="text-cnps-800 focus:ring-cnps-800" /> Féminin
-                  </label>
+              {!isEmployeurType && (
+                <div>
+                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 block">Sexe *</label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-700">
+                      <input type="radio" name="partenaire_sexe" required checked={form.partenaire_sexe === 'M'} onChange={() => handleChange('partenaire_sexe', 'M')} className="text-cnps-800 focus:ring-cnps-800" /> Masculin
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer text-sm font-bold text-slate-700">
+                      <input type="radio" name="partenaire_sexe" required checked={form.partenaire_sexe === 'F'} onChange={() => handleChange('partenaire_sexe', 'F')} className="text-cnps-800 focus:ring-cnps-800" /> Féminin
+                    </label>
+                  </div>
                 </div>
-              </div>
+              )}
               <div>
                 <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-2 block">Adresse Mail</label>
                 <input

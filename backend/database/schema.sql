@@ -39,7 +39,7 @@ CREATE TABLE utilisateurs (
     ressource_id INTEGER      NOT NULL REFERENCES ressources(id) ON DELETE CASCADE,
     email        VARCHAR(200),
     password     VARCHAR(255) NOT NULL,
-    role         VARCHAR(30)  NOT NULL CHECK (role IN ('agent', 'pilote', 'coordonnateur', 'superviseur', 'administrateur')),
+    role         VARCHAR(40)  NOT NULL CHECK (role IN ('agent', 'pilote', 'coordonnateur', 'manager', 'superviseur', 'administrateur_fonctionnel', 'administrateur_systeme')),
     actif        BOOLEAN      NOT NULL DEFAULT TRUE,
     last_login   TIMESTAMP,
     created_at   TIMESTAMP    NOT NULL DEFAULT NOW()
@@ -209,6 +209,7 @@ CREATE TABLE reclamations (
     partenaire_nom_prenoms VARCHAR(300),
     partenaire_raison_sociale VARCHAR(300),
     partenaire_identifiant VARCHAR(100),
+    partenaire_immatricule BOOLEAN NOT NULL DEFAULT TRUE,
     partenaire_sexe   CHAR(1),
     partenaire_telephone VARCHAR(50),
     partenaire_email  VARCHAR(150),
@@ -250,7 +251,7 @@ CREATE INDEX idx_reclamations_agence       ON reclamations(agence_id);
 CREATE INDEX idx_reclamations_pilote       ON reclamations(pilote_id);
 CREATE INDEX idx_reclamations_agent        ON reclamations(agent_createur_id);
 CREATE INDEX idx_reclamations_date         ON reclamations(date_creation DESC);
-CREATE INDEX idx_reclamations_sla          ON reclamations(date_echeance_sla) WHERE statut != 'resolu';
+CREATE INDEX idx_reclamations_sla          ON reclamations(date_echeance_sla) WHERE hors_sla = FALSE AND statut NOT IN ('resolu', 'rejete');
 CREATE INDEX idx_reclamations_processus    ON reclamations(processus_id);
 
 -- Séquence pour numéros de tickets
@@ -324,7 +325,7 @@ CREATE TABLE historique (
                         'soumission_validation', 'validation', 'retour_pilote',
                         'resolution', 'commentaire', 'action_ajoutee',
                         'admin_action', 'login_success', 'login_failed', 'password_change',
-                        'escalade'
+                        'escalade', 'modification', 'document', 'qualification'
                       )),
     commentaire     TEXT,
     metadata        JSONB,
@@ -333,3 +334,20 @@ CREATE TABLE historique (
 
 CREATE INDEX idx_historique_reclamation ON historique(reclamation_id);
 CREATE INDEX idx_historique_date        ON historique(date_action DESC);
+
+-- ============================================================
+-- 14. NOTIFICATIONS (centre de notifications in-app)
+-- ============================================================
+CREATE TABLE notifications (
+    id              SERIAL PRIMARY KEY,
+    utilisateur_id  INTEGER NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+    reclamation_id  INTEGER REFERENCES reclamations(id) ON DELETE CASCADE,
+    type            VARCHAR(40) NOT NULL,
+    titre           VARCHAR(255) NOT NULL,
+    message         TEXT,
+    lu              BOOLEAN NOT NULL DEFAULT FALSE,
+    date_creation   TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_notifications_user_lu   ON notifications(utilisateur_id, lu);
+CREATE INDEX idx_notifications_user_date ON notifications(utilisateur_id, date_creation DESC);

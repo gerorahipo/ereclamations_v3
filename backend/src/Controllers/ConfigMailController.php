@@ -9,7 +9,7 @@ class ConfigMailController
 {
     public function get(): void
     {
-        Auth::requireRole(['administrateur']);
+        Auth::requireRole(['administrateur_systeme']);
         $model = new ConfigMailModel();
         $config = $model->getConfig();
         
@@ -23,7 +23,7 @@ class ConfigMailController
 
     public function save(): void
     {
-        Auth::requireRole(['administrateur']);
+        Auth::requireRole(['administrateur_systeme']);
         $data = json_decode(file_get_contents('php://input'), true);
 
         if (empty($data['host']) || empty($data['port']) || empty($data['from_email']) || empty($data['from_name'])) {
@@ -52,7 +52,7 @@ class ConfigMailController
 
     public function test(): void
     {
-        Auth::requireRole(['administrateur']);
+        Auth::requireRole(['administrateur_systeme']);
         $data = json_decode(file_get_contents('php://input'), true);
 
         if (empty($data['host']) || empty($data['port']) || empty($data['from_email'])) {

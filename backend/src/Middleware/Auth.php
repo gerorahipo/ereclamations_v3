@@ -45,7 +45,7 @@ class Auth
             }
 
             // Les admins peuvent switcher n'importe où
-            if ($payload['role'] === 'administrateur') {
+            if (in_array($payload['role'], ['administrateur_fonctionnel', 'administrateur_systeme'], true)) {
                 $isAuthorized = true;
             }
 
@@ -60,9 +60,9 @@ class Auth
     {
         self::require();
 
-        if ((self::$user['role'] ?? '') === 'administrateur') {
-            return;
-        }
+        // Note : plus de contournement "super-admin" global. Depuis la refonte
+        // des profils, administrateur_fonctionnel et administrateur_systeme ont
+        // chacun un périmètre explicite, listé dans les appels requireRole().
 
         if (!in_array(self::$user['role'] ?? '', $roles, true)) {
             http_response_code(403);

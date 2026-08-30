@@ -31,7 +31,7 @@ class ParametrageController
     // ─── POST /api/ressources ───────────────────────────────
     public function createRessource(): void
     {
-        Auth::requireRole(['superviseur']);
+        Auth::requireRole(['administrateur_systeme']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
 
@@ -52,7 +52,7 @@ class ParametrageController
     // ─── PUT /api/ressources/{id} ───────────────────────────
     public function updateRessource(int $id): void
     {
-        Auth::requireRole(['superviseur']);
+        Auth::requireRole(['administrateur_systeme']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
         $pdo->beginTransaction();
@@ -123,7 +123,7 @@ class ParametrageController
 
     public function createModeSaisine(): void
     {
-        Auth::requireRole(['superviseur', 'administrateur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
         $stmt = $pdo->prepare("INSERT INTO modes_saisine (libelle) VALUES (:lib)");
@@ -133,7 +133,7 @@ class ParametrageController
 
     public function updateModeSaisine(int $id): void
     {
-        Auth::requireRole(['superviseur', 'administrateur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
         $stmt = $pdo->prepare("UPDATE modes_saisine SET libelle = :lib WHERE id = :id");
@@ -252,7 +252,7 @@ class ParametrageController
     // ─── GET /api/affectations ───────────────────────────────
     public function affectations(): void
     {
-        Auth::requireRole(['superviseur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         $sql = "
             SELECT af.*, a.nom AS agence_nom, p.libelle AS processus_libelle,
                    CONCAT(r.prenoms, ' ', r.nom) AS pilote_nom
@@ -270,7 +270,7 @@ class ParametrageController
     // ─── POST /api/affectations ──────────────────────────────
     public function createAffectation(): void
     {
-        Auth::requireRole(['superviseur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
 
@@ -312,7 +312,7 @@ class ParametrageController
         ";
 
         // Scoping: pilote/coordonnateur voient uniquement leur agence
-        if (in_array($user['role'], ['pilote', 'coordonnateur', 'agent'])) {
+        if (in_array($user['role'], ['pilote', 'manager', 'agent'])) {
             $sql .= " AND r.agence_id = :agence_id";
             $params[':agence_id'] = $user['agence_id'];
         } elseif (!empty($_GET['agence_id'])) {
@@ -338,7 +338,7 @@ class ParametrageController
     // ─── GET /api/utilisateurs ───────────────────────────────
     public function utilisateurs(): void
     {
-        Auth::requireRole(['administrateur', 'superviseur', 'coordonnateur']);
+        Auth::requireRole(['administrateur_systeme', 'administrateur_fonctionnel', 'superviseur']);
         $pdo    = Database::getConnection();
         $user   = Auth::$user;
 
@@ -363,7 +363,7 @@ class ParametrageController
             $sql .= " AND u.role IN (" . implode(',', $placeholders) . ")";
         }
 
-        if ($user['role'] === 'coordonnateur') {
+        if (in_array($user['role'], ['manager', 'superviseur'], true)) {
             $sql .= " AND r.agence_id = :agence_id";
             $params[':agence_id'] = $user['agence_id'];
         }
@@ -377,7 +377,7 @@ class ParametrageController
     // ─── POST /api/admin/motifs ──────────────────────────────
     public function createMotif(): void
     {
-        Auth::requireRole(['superviseur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
 
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
@@ -400,7 +400,7 @@ class ParametrageController
     // ─── PUT /api/admin/motifs/{id} ──────────────────────────
     public function updateMotif(int $id): void
     {
-        Auth::requireRole(['superviseur', 'coordonnateur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
 
@@ -418,7 +418,7 @@ class ParametrageController
     // ─── POST /api/admin/sous-motifs ──────────────────────────
     public function createSousMotif(): void
     {
-        Auth::requireRole(['superviseur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
 
@@ -440,7 +440,7 @@ class ParametrageController
     // ─── PUT /api/admin/sous-motifs/{id} ──────────────────────
     public function updateSousMotif(int $id): void
     {
-        Auth::requireRole(['superviseur', 'coordonnateur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
 
@@ -458,7 +458,7 @@ class ParametrageController
     // ─── POST /api/admin/processus ──────────────────────────
     public function createProcessus(): void
     {
-        Auth::requireRole(['superviseur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
 
@@ -472,7 +472,7 @@ class ParametrageController
     // ─── POST /api/admin/agences ─────────────────────────────
     public function createAgence(): void
     {
-        Auth::requireRole(['superviseur']);
+        Auth::requireRole(['administrateur_systeme']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
 
@@ -492,7 +492,7 @@ class ParametrageController
     // ─── POST /api/admin/utilisateurs ────────────────────────
     public function createUtilisateur(): void
     {
-        Auth::requireRole(['superviseur', 'coordonnateur']);
+        Auth::requireRole(['administrateur_systeme']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
 
@@ -544,7 +544,7 @@ class ParametrageController
     // ─── PUT /api/admin/utilisateurs/{id} ─────────────────────
     public function updateUtilisateur(int $id): void
     {
-        Auth::requireRole(['superviseur', 'coordonnateur']);
+        Auth::requireRole(['administrateur_systeme']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
 
@@ -608,7 +608,7 @@ class ParametrageController
     // ─── PUT /api/processus/{id} ─────────────────────────────
     public function updateProcessus(int $id): void
     {
-        Auth::requireRole(['superviseur', 'coordonnateur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
 
@@ -624,7 +624,7 @@ class ParametrageController
     // ─── PUT /api/agences/{id} ─────────────────────────────
     public function updateAgence(int $id): void
     {
-        Auth::requireRole(['superviseur', 'coordonnateur']);
+        Auth::requireRole(['administrateur_systeme']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
 
@@ -637,7 +637,7 @@ class ParametrageController
     // ─── POST /api/regimes ──────────────────────────────────
     public function createRegime(): void
     {
-        Auth::requireRole(['superviseur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
 
@@ -653,7 +653,7 @@ class ParametrageController
     // ─── PUT /api/regimes/{id} ──────────────────────────────
     public function updateRegime(int $id): void
     {
-        Auth::requireRole(['superviseur', 'coordonnateur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
 
@@ -668,7 +668,7 @@ class ParametrageController
     // ─── POST /api/types-clients ─────────────────────────────
     public function createTypeClient(): void
     {
-        Auth::requireRole(['superviseur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
 
@@ -682,7 +682,7 @@ class ParametrageController
     // ─── PUT /api/types-clients/{id} ─────────────────────────
     public function updateTypeClient(int $id): void
     {
-        Auth::requireRole(['superviseur', 'coordonnateur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
 
@@ -695,7 +695,7 @@ class ParametrageController
     // ─── POST /api/categories-causes ────────────────────────
     public function createCategoryCause(): void
     {
-        Auth::requireRole(['superviseur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
 
@@ -709,7 +709,7 @@ class ParametrageController
     // ─── PUT /api/categories-causes/{id} ─────────────────────
     public function updateCategoryCause(int $id): void
     {
-        Auth::requireRole(['superviseur', 'coordonnateur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
 
@@ -722,7 +722,7 @@ class ParametrageController
     // ─── POST /api/causes ────────────────────────────────────
     public function createCause(): void
     {
-        Auth::requireRole(['superviseur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
 
@@ -736,7 +736,7 @@ class ParametrageController
     // ─── PUT /api/causes/{id} ────────────────────────────────
     public function updateCause(int $id): void
     {
-        Auth::requireRole(['superviseur', 'coordonnateur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
 
@@ -754,7 +754,7 @@ class ParametrageController
     // ─── POST /api/causes/import ─────────────────────────────
     public function importCauses(): void
     {
-        Auth::requireRole(['superviseur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         
         if (!isset($_FILES['file'])) {
             http_response_code(400);
@@ -835,7 +835,7 @@ class ParametrageController
     // ─── POST /api/causes/bulk ─────────────────────────────
     public function bulkCauses(): void
     {
-        Auth::requireRole(['superviseur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         $data = json_decode(file_get_contents('php://input'), true);
         
         if (!is_array($data)) {
@@ -899,7 +899,7 @@ class ParametrageController
 
     public function bulkRessources(): void
     {
-        Auth::requireRole(['superviseur']);
+        Auth::requireRole(['administrateur_systeme']);
         $data = json_decode(file_get_contents('php://input'), true);
         
         if (!is_array($data)) {
@@ -953,7 +953,7 @@ class ParametrageController
 
     public function bulkMotifs(): void
     {
-        Auth::requireRole(['superviseur']);
+        Auth::requireRole(['administrateur_fonctionnel']);
         $data = json_decode(file_get_contents('php://input'), true);
         
         if (!is_array($data)) {
@@ -1067,13 +1067,21 @@ class ParametrageController
         $filter = 'WHERE 1=1';
         $params = [];
 
-        if ($isDigitalAgency) {
-            // Pas de restriction pour l'agence digitale, accès global
-            $filter = 'WHERE 1=1';
+        // Rôles transverses (coordonnateur / admins / agence digitale) : vue toutes
+        // agences, ou zoom sur une agence precise si ?agence_id est fourni.
+        // Les autres roles sont scopes a leur propre agence.
+        $isTransverse   = $isDigitalAgency || in_array($user['role'], ['coordonnateur', 'administrateur_fonctionnel', 'administrateur_systeme'], true);
+        $selectedAgence = (!empty($_GET['agence_id']) && ctype_digit((string)$_GET['agence_id'])) ? (int)$_GET['agence_id'] : null;
+
+        if ($isTransverse) {
+            if ($selectedAgence) {
+                $filter = 'WHERE r.agence_id = :agence_id';
+                $params[':agence_id'] = $selectedAgence;
+            }
         } elseif ($user['role'] === 'agent') {
             $filter = 'WHERE r.agent_createur_id = :uid';
             $params[':uid'] = $user['id'];
-        } elseif (in_array($user['role'], ['pilote', 'coordonnateur'])) {
+        } elseif (in_array($user['role'], ['pilote', 'manager', 'superviseur'])) {
             $filter = 'WHERE r.agence_id = :agence_id';
             $params[':agence_id'] = $user['agence_id'];
         }
@@ -1089,6 +1097,8 @@ class ParametrageController
                 COUNT(*) FILTER (WHERE r.hors_sla = TRUE AND r.statut NOT IN ('resolu','rejete')) AS hors_sla,
                 COUNT(*) FILTER (WHERE r.statut IN ('resolu', 'rejete') AND r.date_resolution <= r.date_echeance_sla) AS dans_sla,
                 COUNT(*) FILTER (WHERE r.statut = 'en_cours' AND r.remarques_coordination IS NOT NULL AND r.remarques_coordination <> '') AS en_attente_correction,
+                COUNT(*) FILTER (WHERE r.pilote_id IS NOT NULL) AS affectees,
+                COUNT(*) FILTER (WHERE r.statut IN ('nouveau','en_cours') AND r.categorie_cause_id IS NULL) AS a_analyser,
                 COUNT(*)                                         AS total
             FROM reclamations r
             $filter
@@ -1096,26 +1106,46 @@ class ParametrageController
         $stmtBase->execute($params);
         $base = $stmtBase->fetch();
 
+        // Délai moyen de traitement (en jours), sur le même périmètre que les compteurs
+        $stmtAvg = $pdo->prepare("
+            SELECT AVG(
+                CASE WHEN r.statut IN ('resolu', 'rejete') AND r.date_resolution IS NOT NULL
+                THEN EXTRACT(EPOCH FROM (r.date_resolution - r.date_creation)) / 86400
+                END
+            ) AS avg_resolution_days
+            FROM reclamations r
+            $filter
+        ");
+        $stmtAvg->execute($params);
+        $avgResolutionDays = $stmtAvg->fetchColumn();
+        if ($base) {
+            $base['avg_resolution_days'] = $avgResolutionDays !== null ? round((float)$avgResolutionDays, 1) : null;
+        }
+
         // Compteur des tickets escaladés hors de l'agence (actifs et retournés)
         $escaladeesCount = 0;
-        if ($isDigitalAgency || $user['role'] === 'superviseur') {
+        if ($isTransverse && !$selectedAgence) {
+            // Vue transverse globale
             $escaladeesCount = (int)$pdo->query("
-                SELECT COUNT(*) 
-                FROM reclamations 
+                SELECT COUNT(*)
+                FROM reclamations
                 WHERE pilote_escaladeur_id IS NOT NULL
             ")->fetchColumn();
-        } elseif (in_array($user['role'], ['pilote', 'coordonnateur'])) {
+        } elseif (in_array($user['role'], ['pilote', 'manager', 'superviseur']) || ($isTransverse && $selectedAgence)) {
+            // Agence de l'utilisateur (rôles scopés) ; le zoom ?agence_id n'est
+            // pris en compte que pour les rôles transverses.
+            $escAgence = ($isTransverse && $selectedAgence) ? $selectedAgence : (int)$user['agence_id'];
             $stmtEsc = $pdo->prepare("
-                SELECT COUNT(*) 
-                FROM reclamations 
+                SELECT COUNT(*)
+                FROM reclamations
                 WHERE agence_origine_id = :agence_id AND pilote_escaladeur_id IS NOT NULL
             ");
-            $stmtEsc->execute([':agence_id' => $user['agence_id']]);
+            $stmtEsc->execute([':agence_id' => $escAgence]);
             $escaladeesCount = (int)$stmtEsc->fetchColumn();
         }
 
         $nonQualifieesCount = 0;
-        if ($user['role'] === 'administrateur' || $isDigitalAgency) {
+        if (in_array($user['role'], ['administrateur_fonctionnel', 'administrateur_systeme'], true) || $isDigitalAgency) {
             $stmtNQ = $pdo->prepare("
                 SELECT COUNT(*) 
                 FROM reclamations r
@@ -1180,20 +1210,138 @@ class ParametrageController
         $stmtEvolution->execute($params);
         $evolution = $stmtEvolution->fetchAll();
 
+        $objectifModel = new \App\Models\ObjectifModel();
+
         echo json_encode([
             'data' => [
                 'counters' => $base,
                 'saisine'  => $saisine,
                 'clients'  => $clients,
                 'motifs'   => $motifs,
-                'evolution'=> $evolution
+                'evolution'=> $evolution,
+                'objectifs'=> $objectifModel->get(),
             ]
         ]);
     }
 
-    public function deleteEntity(string $table, int $id): void
+    // ─── GET /api/reporting — Reporting du superviseur (scopé à son agence) ──
+    public function reporting(): void
     {
         Auth::requireRole(['superviseur']);
+        $pdo      = Database::getConnection();
+        $user     = Auth::$user;
+        $agenceId = (int)($user['agence_id'] ?? 0);
+
+        // Charge et productivité par pilote de l'agence
+        $stmtPilotes = $pdo->prepare("
+            SELECT res.nom, res.prenoms,
+                COUNT(r.id) AS total,
+                COUNT(r.id) FILTER (WHERE r.statut = 'nouveau')                                       AS a_affecter,
+                COUNT(r.id) FILTER (WHERE r.statut = 'en_cours')                                       AS en_cours,
+                COUNT(r.id) FILTER (WHERE r.statut IN ('resolu','rejete'))                             AS resolus,
+                COUNT(r.id) FILTER (WHERE r.hors_sla = TRUE AND r.statut NOT IN ('resolu','rejete'))   AS hors_delai
+            FROM utilisateurs u
+            JOIN ressources res ON res.id = u.ressource_id
+            LEFT JOIN reclamations r ON r.pilote_id = u.id AND r.agence_id = :agp
+            WHERE u.role = 'pilote' AND res.agence_id = :agr AND u.actif = TRUE
+            GROUP BY res.nom, res.prenoms
+            ORDER BY total DESC
+        ");
+        $stmtPilotes->execute([':agp' => $agenceId, ':agr' => $agenceId]);
+        $parPilote = $stmtPilotes->fetchAll();
+
+        // Répartition par statut
+        $stmtStatut = $pdo->prepare("
+            SELECT statut, COUNT(*) AS count FROM reclamations
+            WHERE agence_id = :ag GROUP BY statut
+        ");
+        $stmtStatut->execute([':ag' => $agenceId]);
+        $parStatut = $stmtStatut->fetchAll();
+
+        // Répartition par processus métier
+        $stmtProc = $pdo->prepare("
+            SELECT p.libelle, p.code, COUNT(*) AS count
+            FROM reclamations r JOIN processus p ON p.id = r.processus_id
+            WHERE r.agence_id = :ag GROUP BY p.libelle, p.code ORDER BY count DESC
+        ");
+        $stmtProc->execute([':ag' => $agenceId]);
+        $parProcessus = $stmtProc->fetchAll();
+
+        // Top motifs
+        $stmtMotif = $pdo->prepare("
+            SELECT m.libelle, COUNT(*) AS count
+            FROM reclamations r JOIN motifs m ON m.id = r.motif_id
+            WHERE r.agence_id = :ag GROUP BY m.libelle ORDER BY count DESC LIMIT 8
+        ");
+        $stmtMotif->execute([':ag' => $agenceId]);
+        $parMotif = $stmtMotif->fetchAll();
+
+        // Compteurs créés / qualifiés (un ticket est qualifié quand son processus n'est pas NQ)
+        $stmtCounters = $pdo->prepare("
+            SELECT
+                COUNT(*)                                     AS crees,
+                COUNT(*) FILTER (WHERE p.code <> 'NQ')       AS qualifies,
+                COUNT(*) FILTER (WHERE p.code = 'NQ')        AS non_qualifies
+            FROM reclamations r LEFT JOIN processus p ON p.id = r.processus_id
+            WHERE r.agence_id = :ag
+        ");
+        $stmtCounters->execute([':ag' => $agenceId]);
+        $counters = $stmtCounters->fetch();
+
+        echo json_encode([
+            'data' => [
+                'agence_id'     => $agenceId,
+                'agence_nom'    => $user['agence_nom'] ?? '',
+                'par_pilote'    => $parPilote,
+                'par_statut'    => $parStatut,
+                'par_processus' => $parProcessus,
+                'par_motif'     => $parMotif,
+                'counters'      => $counters,
+            ]
+        ]);
+    }
+
+    // ─── GET /api/objectifs ───────────────────────────────────
+    public function objectifs(): void
+    {
+        Auth::require();
+        $model = new \App\Models\ObjectifModel();
+        echo json_encode(['data' => $model->get()]);
+    }
+
+    // ─── PUT /api/objectifs ───────────────────────────────────
+    public function saveObjectifs(): void
+    {
+        Auth::requireRole(['administrateur_fonctionnel']);
+        $data = json_decode(file_get_contents('php://input'), true);
+
+        if (!isset($data['objectif_traitement_pct']) || !isset($data['objectif_delai_pct'])) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Champs requis : objectif_traitement_pct, objectif_delai_pct']);
+            return;
+        }
+
+        $traitement = (float)$data['objectif_traitement_pct'];
+        $delai      = (float)$data['objectif_delai_pct'];
+
+        if ($traitement < 0 || $traitement > 100 || $delai < 0 || $delai > 100) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Les objectifs doivent être compris entre 0 et 100.']);
+            return;
+        }
+
+        $model = new \App\Models\ObjectifModel();
+        $model->save([
+            'objectif_traitement_pct' => $traitement,
+            'objectif_delai_pct'      => $delai,
+        ]);
+
+        echo json_encode(['message' => 'Objectifs mis à jour', 'data' => $model->get()]);
+    }
+
+    public function deleteEntity(string $table, int $id): void
+    {
+        Auth::requireRole(['administrateur_fonctionnel', 'administrateur_systeme']);
         $pdo = Database::getConnection();
         
         $allowedTables = ['processus', 'motifs', 'sous_motifs', 'regimes', 'types_clients', 'agences', 'ressources', 'utilisateurs', 'categories_causes', 'causes', 'affectations_pilotes', 'modes_saisine', 'travailleurs', 'employeurs', 'sinistres'];
@@ -1226,7 +1374,7 @@ class ParametrageController
     // ─── POST /api/travailleurs/bulk ────────────────────────────
     public function bulkTravailleurs(): void
     {
-        Auth::requireRole(['superviseur', 'administrateur']);
+        Auth::requireRole(['administrateur_systeme']);
         $data = json_decode(file_get_contents('php://input'), true);
         if (!is_array($data)) {
             http_response_code(400);
@@ -1266,7 +1414,7 @@ class ParametrageController
     // ─── POST /api/employeurs/bulk ──────────────────────────────
     public function bulkEmployeurs(): void
     {
-        Auth::requireRole(['superviseur', 'administrateur']);
+        Auth::requireRole(['administrateur_systeme']);
         $data = json_decode(file_get_contents('php://input'), true);
         if (!is_array($data)) {
             http_response_code(400);
@@ -1310,7 +1458,7 @@ class ParametrageController
     // ─── POST /api/sinistres/bulk ───────────────────────────────
     public function bulkSinistres(): void
     {
-        Auth::requireRole(['superviseur', 'administrateur']);
+        Auth::requireRole(['administrateur_systeme']);
         $data = json_decode(file_get_contents('php://input'), true);
         if (!is_array($data)) {
             http_response_code(400);
@@ -1348,7 +1496,7 @@ class ParametrageController
     }
     public function travailleurs(): void
     {
-        Auth::requireRole(['superviseur', 'administrateur']);
+        Auth::requireRole(['administrateur_systeme']);
         $pdo = Database::getConnection();
         try {
             $stmt = $pdo->query("SELECT * FROM travailleurs");
@@ -1361,7 +1509,7 @@ class ParametrageController
 
     public function employeurs(): void
     {
-        Auth::requireRole(['superviseur', 'administrateur']);
+        Auth::requireRole(['administrateur_systeme']);
         $pdo = Database::getConnection();
         try {
             $stmt = $pdo->query("SELECT * FROM employeurs ORDER BY raison_sociale");
@@ -1375,7 +1523,7 @@ class ParametrageController
 
     public function sinistres(): void
     {
-        Auth::requireRole(['superviseur', 'administrateur']);
+        Auth::requireRole(['administrateur_systeme']);
         $pdo = Database::getConnection();
         try {
             $stmt = $pdo->query("SELECT * FROM sinistres");
@@ -1388,7 +1536,7 @@ class ParametrageController
 
     public function createTravailleur(): void
     {
-        Auth::requireRole(['superviseur', 'administrateur']);
+        Auth::requireRole(['administrateur_systeme']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
         $stmt = $pdo->prepare("INSERT INTO travailleurs (numero_cnps, nom, prenoms, telephone, email) VALUES (:num, :nom, :pre, :tel, :em) ON CONFLICT (numero_cnps) DO UPDATE SET nom = EXCLUDED.nom, prenoms = EXCLUDED.prenoms, telephone = EXCLUDED.telephone, email = EXCLUDED.email RETURNING id");
@@ -1412,7 +1560,7 @@ class ParametrageController
 
     public function createEmployeur(): void
     {
-        Auth::requireRole(['superviseur', 'administrateur']);
+        Auth::requireRole(['administrateur_systeme']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
         $stmt = $pdo->prepare("INSERT INTO employeurs (numero_cnps, raison_sociale, nom_employeur, telephone, email) VALUES (:num, :rs, :nom, :tel, :em) ON CONFLICT (numero_cnps) DO UPDATE SET raison_sociale = EXCLUDED.raison_sociale, nom_employeur = EXCLUDED.nom_employeur, telephone = EXCLUDED.telephone, email = EXCLUDED.email RETURNING id");
@@ -1440,7 +1588,7 @@ class ParametrageController
     }
     public function updateTravailleur(int $id): void
     {
-        Auth::requireRole(['superviseur', 'administrateur']);
+        Auth::requireRole(['administrateur_systeme']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
         $stmt = $pdo->prepare("UPDATE travailleurs SET numero_cnps = :num, nom = :nom, prenoms = :pre, telephone = :tel, email = :em WHERE id = :id");
@@ -1457,7 +1605,7 @@ class ParametrageController
 
     public function updateEmployeur(int $id): void
     {
-        Auth::requireRole(['superviseur', 'administrateur']);
+        Auth::requireRole(['administrateur_systeme']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
         $stmt = $pdo->prepare("UPDATE employeurs SET numero_cnps = :num, raison_sociale = :rs, nom_employeur = :nom, telephone = :tel, email = :em WHERE id = :id");
@@ -1479,7 +1627,7 @@ class ParametrageController
 
     public function updateSinistre(int $id): void
     {
-        Auth::requireRole(['superviseur', 'administrateur']);
+        Auth::requireRole(['administrateur_systeme']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
         $stmt = $pdo->prepare("UPDATE sinistres SET numero_sinistre = :num, nom = :nom, prenoms = :pre, telephone = :tel, email = :em WHERE id = :id");
@@ -1501,7 +1649,7 @@ class ParametrageController
 
     public function createSinistre(): void
     {
-        Auth::requireRole(['superviseur', 'administrateur']);
+        Auth::requireRole(['administrateur_systeme']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
         $stmt = $pdo->prepare("INSERT INTO sinistres (numero_sinistre, nom, prenoms, telephone, email) VALUES (:num, :nom, :pre, :tel, :em) ON CONFLICT (numero_sinistre) DO UPDATE SET nom = EXCLUDED.nom, prenoms = EXCLUDED.prenoms, telephone = EXCLUDED.telephone, email = EXCLUDED.email RETURNING id");
@@ -1520,7 +1668,7 @@ class ParametrageController
 
     public function clearTravailleurs(): void
     {
-        Auth::requireRole(['superviseur', 'administrateur']);
+        Auth::requireRole(['administrateur_systeme']);
         $pdo = Database::getConnection();
         try {
             $stmt = $pdo->prepare("DELETE FROM travailleurs");
@@ -1535,7 +1683,7 @@ class ParametrageController
 
     public function clearEmployeurs(): void
     {
-        Auth::requireRole(['superviseur', 'administrateur']);
+        Auth::requireRole(['administrateur_systeme']);
         $pdo = Database::getConnection();
         try {
             $stmt = $pdo->prepare("DELETE FROM employeurs");
@@ -1550,7 +1698,7 @@ class ParametrageController
 
     public function clearSinistres(): void
     {
-        Auth::requireRole(['superviseur', 'administrateur']);
+        Auth::requireRole(['administrateur_systeme']);
         $pdo = Database::getConnection();
         try {
             $stmt = $pdo->prepare("DELETE FROM sinistres");
@@ -1565,7 +1713,7 @@ class ParametrageController
 
     public function clearRessourcesNoAccount(): void
     {
-        Auth::requireRole(['administrateur']);
+        Auth::requireRole(['administrateur_systeme']);
         $pdo = Database::getConnection();
         try {
             $stmt = $pdo->prepare("DELETE FROM ressources WHERE id NOT IN (SELECT ressource_id FROM utilisateurs)");

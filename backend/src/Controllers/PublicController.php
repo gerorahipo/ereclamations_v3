@@ -82,7 +82,7 @@ class PublicController
         try {
             $pdo = Database::getConnection();
             
-            $regimes = $pdo->query("SELECT id, libelle FROM regimes WHERE actif = TRUE ORDER BY libelle")->fetchAll(\PDO::FETCH_ASSOC);
+            $regimes = $pdo->query("SELECT id, libelle, has_employeur FROM regimes WHERE actif = TRUE ORDER BY libelle")->fetchAll(\PDO::FETCH_ASSOC);
             $modesSaisine = $pdo->query("SELECT id, libelle FROM modes_saisine WHERE actif = TRUE ORDER BY libelle")->fetchAll(\PDO::FETCH_ASSOC);
             $processus = $pdo->query("SELECT id, code, libelle FROM processus WHERE actif = TRUE ORDER BY code")->fetchAll(\PDO::FETCH_ASSOC);
             $agences = $pdo->query("SELECT id, nom FROM agences WHERE actif = TRUE AND type = 'agence' ORDER BY nom")->fetchAll(\PDO::FETCH_ASSOC);
@@ -127,6 +127,29 @@ class PublicController
                     echo json_encode(['error' => "Le champ {$f} est obligatoire."]);
                     return;
                 }
+            }
+
+            // La requete peut arriver en JSON (booleen natif preserve par json_decode)
+            // OU en multipart/form-data (fichiers joints), auquel cas $data provient de
+            // $_POST et TOUTE valeur est une chaine de caracteres. Un simple (bool) cast
+            // est piegeux ici : en PHP, (bool)"false" vaut TRUE (seules "" et "0" valent
+            // false), ce qui inversait le choix "Non" de l'utilisateur. On interprete donc
+            // explicitement les valeurs chaine.
+            if (!array_key_exists('partenaire_immatricule', $data)) {
+                $estImmatricule = true; // valeur par defaut si le champ est absent
+            } elseif (is_bool($data['partenaire_immatricule'])) {
+                $estImmatricule = $data['partenaire_immatricule'];
+            } else {
+                $estImmatricule = !in_array(strtolower((string)$data['partenaire_immatricule']), ['false', '0', ''], true);
+            }
+            $identifiantError = \App\Utils\PartenaireValidator::validateIdentifiant(
+                $pdo, $estImmatricule, $data['partenaire_identifiant'] ?? null,
+                (int)$data['type_client_id'], (int)$data['regime_id']
+            );
+            if ($identifiantError) {
+                http_response_code(400);
+                echo json_encode(['error' => $identifiantError]);
+                return;
             }
 
             // Chercher l'ID de l'agence digitale par son nom '%digitale%'
@@ -184,13 +207,13 @@ class PublicController
             // Insertion
             $stmt = $pdo->prepare("
                 INSERT INTO reclamations (
-                    numero_ticket, partenaire_type, partenaire_nom_prenoms, partenaire_raison_sociale, 
-                    partenaire_identifiant, partenaire_sexe, partenaire_telephone, partenaire_email, 
-                    partenaire_employeur, regime_id, type_client_id, mode_saisine_id, 
+                    numero_ticket, partenaire_type, partenaire_nom_prenoms, partenaire_raison_sociale,
+                    partenaire_identifiant, partenaire_immatricule, partenaire_sexe, partenaire_telephone, partenaire_email,
+                    partenaire_employeur, regime_id, type_client_id, mode_saisine_id,
                     processus_id, motif_id, sous_motif_id, agence_id, agence_origine_id,
                     description, statut, agent_createur_id, date_creation
                 ) VALUES (
-                    :numero, :type, :nom, :raison, :identifiant, :sexe, :tel, :email, :employeur, :regime, :type_client, :mode, :processus, :motif, :sous_motif, :agence, :agence, :desc, 'nouveau', :user, NOW()
+                    :numero, :type, :nom, :raison, :identifiant, :immatricule, :sexe, :tel, :email, :employeur, :regime, :type_client, :mode, :processus, :motif, :sous_motif, :agence, :agence, :desc, 'nouveau', :user, NOW()
                 ) RETURNING id, numero_ticket
             ");
 
@@ -199,7 +222,8 @@ class PublicController
                 ':type'        => !empty($data['partenaire_raison_sociale']) ? 'entreprise' : 'travailleur',
                 ':nom'         => $data['partenaire_nom_prenoms'] ?? null,
                 ':raison'      => $data['partenaire_raison_sociale'] ?? null,
-                ':identifiant' => $data['partenaire_identifiant'] ?? null,
+                ':identifiant' => $estImmatricule ? ($data['partenaire_identifiant'] ?? null) : null,
+                ':immatricule' => $estImmatricule ? 'true' : 'false',
                 ':sexe'        => $data['partenaire_sexe'] ?? 'M',
                 ':tel'         => $data['partenaire_telephone'],
                 ':email'       => $data['partenaire_email'] ?? null,
@@ -218,46 +242,63 @@ class PublicController
             $result = $stmt->fetch(\PDO::FETCH_ASSOC);
 
             // Gérer l'upload de fichiers
+            $fileErrors = [];
             if (!empty($_FILES['files'])) {
                 $files = $_FILES['files'];
                 $uploadDir = __DIR__ . '/../../storage/attachments/';
                 if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
-                
+
+                $maxFileSize = 5 * 1024 * 1024; // 5 Mo
                 $fileCount = is_array($files['name']) ? count($files['name']) : 1;
                 $allowedExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'jpg', 'jpeg', 'png', 'txt'];
                 $allowedMimes = [
-                    'application/pdf', 
-                    'application/msword', 
+                    'application/pdf',
+                    'application/msword',
                     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                     'application/vnd.ms-excel',
                     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                    'image/jpeg', 
-                    'image/png', 
+                    'image/jpeg',
+                    'image/png',
                     'text/plain'
                 ];
-                
+
                 for ($i = 0; $i < $fileCount; $i++) {
                     $name     = is_array($files['name']) ? $files['name'][$i] : $files['name'];
                     $tmpPath  = is_array($files['tmp_name']) ? $files['tmp_name'][$i] : $files['tmp_name'];
                     $error    = is_array($files['error']) ? $files['error'][$i] : $files['error'];
+                    $size     = is_array($files['size']) ? $files['size'][$i] : $files['size'];
 
-                    if ($error !== UPLOAD_ERR_OK) continue;
+                    if ($error !== UPLOAD_ERR_OK) {
+                        $fileErrors[] = "Erreur d'upload pour {$name}";
+                        continue;
+                    }
+
+                    if ($size > $maxFileSize) {
+                        $fileErrors[] = "Fichier trop volumineux (max 5 Mo) : {$name}";
+                        continue;
+                    }
 
                     $extension = strtolower(pathinfo($name, PATHINFO_EXTENSION));
-                    if (!in_array($extension, $allowedExtensions)) continue;
+                    if (!in_array($extension, $allowedExtensions)) {
+                        $fileErrors[] = "Extension non autorisée : {$name}";
+                        continue;
+                    }
 
                     $finfo = new \finfo(FILEINFO_MIME_TYPE);
                     $mime = $finfo->file($tmpPath);
-                    if (!in_array($mime, $allowedMimes)) continue;
+                    if (!in_array($mime, $allowedMimes)) {
+                        $fileErrors[] = "Type de fichier non autorisé : {$name}";
+                        continue;
+                    }
 
                     $storageName = bin2hex(random_bytes(16)) . '.' . $extension;
                     $destPath = $uploadDir . $storageName;
 
                     if (move_uploaded_file($tmpPath, $destPath)) {
                         $stmtF = $pdo->prepare("
-                            INSERT INTO pieces_jointes 
+                            INSERT INTO pieces_jointes
                                 (reclamation_id, nom_original, nom_stockage, type_mime, taille, chemin, cree_par)
-                            VALUES 
+                            VALUES
                                 (:rid, :orig, :stock, :mime, :size, :path, :uid)
                         ");
                         $stmtF->execute([
@@ -269,8 +310,10 @@ class PublicController
                             ':path'  => 'storage/attachments/' . $storageName,
                             ':uid'   => (int)$agentId
                         ]);
-                        
+
                         \App\Utils\Audit::log($result['id'], 'document', "Fichier joint ajouté depuis le portail public : {$name}");
+                    } else {
+                        $fileErrors[] = "Impossible de sauvegarder {$name}";
                     }
                 }
             }
@@ -278,7 +321,8 @@ class PublicController
             echo json_encode([
                 'message' => 'Réclamation enregistrée avec succès',
                 'id' => $result['id'],
-                'numero_ticket' => $result['numero_ticket']
+                'numero_ticket' => $result['numero_ticket'],
+                'file_errors' => $fileErrors
             ]);
 
         } catch (\Throwable $e) {

@@ -15,6 +15,7 @@ use App\Middleware\Auth;
 use App\Utils\Audit;
 use App\Services\MailService;
 use App\Models\UtilisateurModel;
+use App\Models\NotificationModel;
 
 class ReclamationController
 {
@@ -64,7 +65,7 @@ class ReclamationController
         }
 
         if ($isNonQualifiees) {
-            if ($user['role'] !== 'administrateur' && !$isDigitalAgency) {
+            if (!in_array($user['role'], ['administrateur_fonctionnel', 'administrateur_systeme'], true) && !$isDigitalAgency) {
                 http_response_code(403);
                 echo json_encode(['error' => 'Accès non autorisé à la corbeille des réclamations non qualifiées']);
                 return;
@@ -74,7 +75,7 @@ class ReclamationController
         // ─── Scoping par rôle ─────────────────────────────────
         if ($isNonQualifiees) {
             $sql .= " AND p.code = 'NQ'";
-            if ($user['role'] !== 'administrateur' && !$isDigitalAgency) {
+            if (!in_array($user['role'], ['administrateur_fonctionnel', 'administrateur_systeme'], true) && !$isDigitalAgency) {
                 $sql .= " AND r.agence_id = :user_agence_id";
                 $params[':user_agence_id'] = $user['agence_id'];
             }
@@ -85,7 +86,7 @@ class ReclamationController
                 $sql .= " AND r.agent_createur_id = :uid";
                 $params[':uid'] = $user['id'];
             }
-        } elseif ($user['role'] === 'coordonnateur') {
+        } elseif (in_array($user['role'], ['manager', 'superviseur'], true)) {
             if ($isDigitalAgency) {
                 if ($isEscaladees) {
                     $sql .= " AND r.pilote_escaladeur_id IS NOT NULL";
@@ -121,7 +122,7 @@ class ReclamationController
                 }
                 $params[':agence_id'] = $user['agence_id'];
             }
-        } elseif ($user['role'] === 'superviseur') {
+        } elseif ($user['role'] === 'coordonnateur') {
             $switchAgence = $_GET['agence_id'] ?? null;
             if ($isEscaladees) {
                 if ($switchAgence) {
@@ -159,15 +160,37 @@ class ReclamationController
         }
 
         // Mise à jour automatique hors_sla
-        $pdo->exec("
-            UPDATE reclamations
-            SET hors_sla = TRUE
-            WHERE date_echeance_sla < NOW()
-              AND statut NOT IN ('resolu', 'rejete')
-              AND hors_sla = FALSE
-        ");
+        // Le UPDATE ne s'exécute que s'il y a réellement des tickets à basculer
+        // (le SELECT EXISTS ci-dessous est couvert par idx_reclamations_sla et coûte
+        // quasiment rien quand tout est déjà à jour, contrairement à un UPDATE systématique
+        // sur toute la table à chaque appel de la liste).
+        $hasStaleTickets = $pdo->query("
+            SELECT EXISTS (
+                SELECT 1 FROM reclamations
+                WHERE date_echeance_sla < NOW()
+                  AND statut NOT IN ('resolu', 'rejete')
+                  AND hors_sla = FALSE
+                LIMIT 1
+            )
+        ")->fetchColumn();
 
-        $sql .= " ORDER BY r.date_creation DESC LIMIT 200";
+        if ($hasStaleTickets) {
+            $pdo->exec("
+                UPDATE reclamations
+                SET hors_sla = TRUE
+                WHERE date_echeance_sla < NOW()
+                  AND statut NOT IN ('resolu', 'rejete')
+                  AND hors_sla = FALSE
+            ");
+        }
+
+        // Limite paramétrable (par défaut 200). Les tableaux de bord demandent
+        // un petit nombre (ex. ?limit=10) pour n'afficher que les derniers tickets.
+        $limit = 200;
+        if (!empty($_GET['limit']) && (int)$_GET['limit'] > 0 && (int)$_GET['limit'] <= 200) {
+            $limit = (int)$_GET['limit'];
+        }
+        $sql .= " ORDER BY r.date_creation DESC LIMIT " . $limit;
 
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
@@ -178,7 +201,7 @@ class ReclamationController
     // ─── POST /api/reclamations ──────────────────────────────
     public function create(): void
     {
-        Auth::requireRole(['agent', 'pilote', 'coordonnateur', 'superviseur']);
+        Auth::requireRole(['agent', 'pilote', 'coordonnateur', 'manager']);
 
         $data = json_decode(file_get_contents('php://input'), true);
 
@@ -212,6 +235,17 @@ class ReclamationController
         $pdo  = Database::getConnection();
         $agenceId = $user['agence_id'];
 
+        $estImmatricule = !array_key_exists('partenaire_immatricule', $data) || (bool)$data['partenaire_immatricule'];
+        $identifiantError = \App\Utils\PartenaireValidator::validateIdentifiant(
+            $pdo, $estImmatricule, $data['partenaire_identifiant'] ?? null,
+            (int)$data['type_client_id'], (int)$data['regime_id']
+        );
+        if ($identifiantError) {
+            http_response_code(400);
+            echo json_encode(['error' => $identifiantError]);
+            return;
+        }
+
         // 1. Détermination automatique du pilote
         // Affectation automatique si un seul pilote gère ce processus dans l'agence
         $processusId = (int)$data['processus_id'];
@@ -222,17 +256,17 @@ class ReclamationController
         // Note: numero_ticket et date_echeance_sla sont gérés par le trigger
         $stmt = $pdo->prepare("
             INSERT INTO reclamations
-                (partenaire_type, partenaire_id, partenaire_nom, 
+                (partenaire_type, partenaire_id, partenaire_nom,
                  partenaire_nom_prenoms, partenaire_raison_sociale, partenaire_employeur_numero_cnps,
-                 partenaire_identifiant, partenaire_sexe, partenaire_telephone,
+                 partenaire_identifiant, partenaire_immatricule, partenaire_sexe, partenaire_telephone,
                  partenaire_email, partenaire_employeur, date_reception,
-                 regime_id, type_client_id, mode_saisine_id, 
+                 regime_id, type_client_id, mode_saisine_id,
                  processus_id, motif_id, sous_motif_id,
                  description, statut, agent_createur_id, pilote_id, agence_id, agence_origine_id, date_creation)
             VALUES
-                (:ptype, :pid, :pnom, 
+                (:ptype, :pid, :pnom,
                  :pnom_prenoms, :praison_sociale, :pemployeur_cnps,
-                 :pidentifiant, :psexe, :ptele, :pemail, :pemployeur, :date_reception,
+                 :pidentifiant, :pimmatricule, :psexe, :ptele, :pemail, :pemployeur, :date_reception,
                  :regime_id, :type_client_id, :mode_id,
                  :proc_id, :motif_id, :sous_motif_id,
                  :description, :statut, :agent_id, :pilote_id, :agence_id, :agence_id, NOW())
@@ -246,7 +280,8 @@ class ReclamationController
             ':pnom_prenoms'   => $data['partenaire_nom_prenoms'] ?? null,
             ':praison_sociale'=> $data['partenaire_raison_sociale'] ?? null,
             ':pemployeur_cnps'=> $data['partenaire_employeur_numero_cnps'] ?? null,
-            ':pidentifiant'   => $data['partenaire_identifiant'] ?? null,
+            ':pidentifiant'   => $estImmatricule ? ($data['partenaire_identifiant'] ?? null) : null,
+            ':pimmatricule'   => $estImmatricule ? 'true' : 'false',
             ':psexe'          => $data['partenaire_sexe'] ?? null,
             ':ptele'          => $data['partenaire_telephone'] ?? null,
             ':pemail'         => $data['partenaire_email'] ?? null,
@@ -273,7 +308,7 @@ class ReclamationController
         
         Audit::log($recId, 'creation', $msg . " (Ticket: " . $result['numero_ticket'] . ")");
 
-        // 3. Notification Email au pilote si affecté
+        // 3. Notification (email + in-app) au pilote si affecté
         if ($piloteId) {
             $userModel = new UtilisateurModel();
             $pilot = $userModel->findById($piloteId);
@@ -288,6 +323,11 @@ class ReclamationController
                 } catch (\Exception $e) {
                     error_log("Erreur lors de la notification de nouvelle réclamation: " . $e->getMessage());
                 }
+                (new NotificationModel())->create(
+                    $piloteId, $recId, 'creation',
+                    "Nouvelle réclamation affectée : {$result['numero_ticket']}",
+                    "Une nouvelle réclamation vous a été affectée automatiquement."
+                );
             }
         }
 
@@ -406,7 +446,7 @@ class ReclamationController
                     echo json_encode(['error' => 'Accès non autorisé']);
                     return;
                 }
-            } elseif ($user['role'] === 'coordonnateur') {
+            } elseif ($user['role'] === 'manager') {
                 if ($rec['agence_id'] != $user['agence_id'] && $rec['agence_origine_id'] != $user['agence_id']) {
                     http_response_code(403);
                     echo json_encode(['error' => 'Accès non autorisé']);
@@ -439,10 +479,130 @@ class ReclamationController
         ]);
     }
 
+    // ─── PUT /api/reclamations/{id}/infos ────────────────────
+    // Correction d'une réclamation par l'agent créateur (Exigence 10).
+    // Autorisé uniquement tant que le dossier n'a pas été soumis à
+    // validation (statut nouveau ou en_cours). Chaque modification est
+    // tracée dans l'historique (horodatée + attribuée à l'auteur).
+    public function updateInfos(int $id): void
+    {
+        Auth::requireRole(['agent']);
+        $pdo  = Database::getConnection();
+        $user = Auth::$user;
+
+        $stmt = $pdo->prepare("SELECT * FROM reclamations WHERE id = :id");
+        $stmt->execute([':id' => $id]);
+        $rec = $stmt->fetch();
+
+        if (!$rec) {
+            http_response_code(404);
+            echo json_encode(['error' => 'Réclamation introuvable']);
+            return;
+        }
+
+        if ((int)$rec['agent_createur_id'] !== (int)$user['id']) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Seul l\'agent créateur peut corriger cette réclamation']);
+            return;
+        }
+
+        if (!in_array($rec['statut'], ['nouveau', 'en_cours'], true)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'La réclamation ne peut plus être corrigée à ce stade (déjà soumise à validation ou clôturée)']);
+            return;
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true) ?: [];
+
+        // Champs autorisés à la correction : informations client + description
+        // + motif/sous-motif/processus (le régime et le type de client restent
+        // fixes, ils ne font pas partie du périmètre de correction).
+        $allowed = [
+            'partenaire_nom_prenoms', 'partenaire_raison_sociale', 'partenaire_identifiant',
+            'partenaire_immatricule', 'partenaire_sexe', 'partenaire_telephone',
+            'partenaire_email', 'partenaire_employeur', 'partenaire_employeur_numero_cnps',
+            'description', 'motif_id', 'sous_motif_id', 'processus_id',
+        ];
+
+        // Re-validation du format du Numéro CNPS si l'identifiant ou le statut
+        // d'immatriculation change (le régime/type de client restent ceux de
+        // la réclamation d'origine).
+        if (array_key_exists('partenaire_identifiant', $data) || array_key_exists('partenaire_immatricule', $data)) {
+            $estImmatricule = array_key_exists('partenaire_immatricule', $data)
+                ? (bool)$data['partenaire_immatricule']
+                : (bool)$rec['partenaire_immatricule'];
+            $identifiant = array_key_exists('partenaire_identifiant', $data)
+                ? $data['partenaire_identifiant']
+                : $rec['partenaire_identifiant'];
+
+            $identifiantError = \App\Utils\PartenaireValidator::validateIdentifiant(
+                $pdo, $estImmatricule, $identifiant, (int)$rec['type_client_id'], (int)$rec['regime_id']
+            );
+            if ($identifiantError) {
+                http_response_code(400);
+                echo json_encode(['error' => $identifiantError]);
+                return;
+            }
+        }
+
+        $set     = [];
+        $params  = [':id' => $id];
+        $changes = [];
+
+        foreach ($allowed as $field) {
+            if (!array_key_exists($field, $data)) continue;
+
+            $newVal = $data[$field];
+            if ($field === 'partenaire_immatricule') $newVal = $newVal ? 'true' : 'false';
+
+            $oldVal = $rec[$field];
+            if ((string)$newVal !== (string)$oldVal) {
+                $fmt = function ($v) {
+                    if ($v === null || $v === '') return '—';
+                    if (is_bool($v)) return $v ? 'Oui' : 'Non';
+                    if ($v === 'true' || $v === 't')  return 'Oui';
+                    if ($v === 'false' || $v === 'f') return 'Non';
+                    return $v;
+                };
+                $changes[] = "{$field} : « " . $fmt($oldVal) . " » → « " . $fmt($newVal) . " »";
+            }
+            $set[]              = "{$field} = :{$field}";
+            $params[":{$field}"] = $newVal;
+        }
+
+        if (empty($set)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Aucune modification transmise']);
+            return;
+        }
+
+        // Le délai SLA n'est calculé qu'à la création (trigger BEFORE INSERT).
+        // Si le sous-motif change, on recalcule ici l'échéance à partir du
+        // nouveau délai de traitement.
+        if (array_key_exists('sous_motif_id', $data) && (int)$data['sous_motif_id'] !== (int)$rec['sous_motif_id']) {
+            $stmtD = $pdo->prepare("SELECT delai_traitement_jours FROM sous_motifs WHERE id = :id");
+            $stmtD->execute([':id' => $data['sous_motif_id']]);
+            $delai = $stmtD->fetchColumn();
+            if ($delai) {
+                $set[] = "date_echeance_sla = date_creation + (:delai || ' days')::interval";
+                $params[':delai'] = (int)$delai;
+            }
+        }
+
+        $sql = "UPDATE reclamations SET " . implode(', ', $set) . " WHERE id = :id";
+        $pdo->prepare($sql)->execute($params);
+
+        if (!empty($changes)) {
+            Audit::log($id, 'modification', "Réclamation corrigée par {$user['prenoms']} {$user['nom']} :\n" . implode("\n", $changes));
+        }
+
+        echo json_encode(['message' => 'Réclamation mise à jour']);
+    }
+
     // ─── PUT /api/reclamations/{id}/statut ───────────────────
     public function updateStatut(int $id): void
     {
-        Auth::requireRole(['pilote', 'coordonnateur', 'superviseur']);
+        Auth::requireRole(['pilote', 'coordonnateur', 'manager']);
 
         $data   = json_decode(file_get_contents('php://input'), true);
         $statut = $data['statut'] ?? '';
@@ -490,7 +650,7 @@ class ReclamationController
         // Notification Coordonnateur si passage en 'a_valider'
         if ($statut === 'a_valider') {
             $userModel = new UtilisateurModel();
-            $coordinators = $userModel->getCoordonnateursByAgence($user['agence_id']);
+            $coordinators = $userModel->getManagersByAgence($user['agence_id']);
             
             // On récupère les infos du ticket pour l'email
             $stmtTicket = $pdo->prepare("SELECT numero_ticket FROM reclamations WHERE id = ?");
@@ -504,6 +664,11 @@ class ReclamationController
                     'pilote_nom' => $user['prenoms'] . ' ' . $user['nom']
                 ], $coord);
             }
+            (new NotificationModel())->createForMany(
+                array_column($coordinators, 'id'), $id, 'soumission',
+                "Dossier à valider : {$ticketNum}",
+                "{$user['prenoms']} {$user['nom']} a soumis ce dossier à votre validation."
+            );
         }
 
         echo json_encode(['message' => 'Statut mis à jour']);
@@ -512,7 +677,7 @@ class ReclamationController
     // ─── PUT /api/reclamations/{id}/analyse ─────────────────
     public function updateAnalyse(int $id): void
     {
-        Auth::requireRole(['pilote', 'superviseur']);
+        Auth::requireRole(['pilote', 'coordonnateur']);
 
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
@@ -574,7 +739,7 @@ class ReclamationController
 
     public function updateRemarques(int $id): void
     {
-        Auth::requireRole(['coordonnateur', 'superviseur']);
+        Auth::requireRole(['manager']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
         $user = Auth::$user;
@@ -616,7 +781,7 @@ class ReclamationController
     // ─── PUT /api/reclamations/{id}/escalader ────────────────
     public function escalader(int $id): void
     {
-        Auth::requireRole(['pilote', 'superviseur']);
+        Auth::requireRole(['pilote']);
         $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
         $user = Auth::$user;
@@ -736,7 +901,7 @@ class ReclamationController
         $stmtDigital->execute([':nom' => '%digitale%']);
         $digitalAgencyId = (int)$stmtDigital->fetchColumn();
 
-        if ($user['role'] !== 'superviseur' && $user['role'] !== 'administrateur' && (int)$user['agence_id'] !== $digitalAgencyId) {
+        if ($user['role'] !== 'coordonnateur' && (int)$user['agence_id'] !== $digitalAgencyId) {
             http_response_code(403);
             echo json_encode(['error' => "Seuls les agents de l'Agence Digitale peuvent qualifier ces réclamations."]);
             return;
@@ -829,7 +994,7 @@ class ReclamationController
     // ─── Helper: vérification des droits sur la réclamation ──
     private function checkAccess($pdo, int $reclamationId, array $user): bool
     {
-        if ($user['role'] === 'administrateur' || $user['role'] === 'superviseur') {
+        if (in_array($user['role'], ['coordonnateur', 'administrateur_fonctionnel', 'administrateur_systeme'], true)) {
             return true;
         }
 
@@ -855,7 +1020,7 @@ class ReclamationController
             return (int)$rec['agent_createur_id'] === (int)$user['id'];
         }
 
-        if (in_array($user['role'], ['pilote', 'coordonnateur', 'manager'])) {
+        if (in_array($user['role'], ['pilote', 'manager', 'superviseur'])) {
             return (int)$rec['agence_id'] === (int)$user['agence_id'] || (int)$rec['agence_origine_id'] === (int)$user['agence_id'];
         }
 
