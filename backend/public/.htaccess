@@ -9,6 +9,15 @@ Options -MultiViews
 # Activer le module de réécriture
 RewriteEngine On
 
+# Apache ne transmet pas l'en-tête Authorization à PHP par défaut
+# (CGI/FastCGI/mod_php selon les configurations). On le recopie
+# explicitement dans HTTP_AUTHORIZATION pour que JWT::fromRequest()
+# puisse le lire. Sans cette ligne, toute requête authentifiée
+# renvoie 401 même avec un token valide (déconnexion immédiate après
+# connexion).
+RewriteCond %{HTTP:Authorization} .
+RewriteRule ^ - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
 # Bloquer l'accès aux fichiers sensibles
 RewriteRule ^\.env$ - [F,L]
 RewriteRule ^src/ - [F,L]
