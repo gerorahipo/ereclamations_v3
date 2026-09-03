@@ -17,7 +17,7 @@ import {
 import { reclamationsApi, parametrageApi } from '../api/index.js'
 import StatusBadge from '../components/tickets/StatusBadge.jsx'
 import { useAuth } from '../context/AuthContext.jsx'
-import { exportToExcel, exportToPDF } from '../utils/exportUtils.js'
+import { exportToExcel, exportToPDF, exportAnalyticsToExcel, exportAnalyticsToPDF } from '../utils/exportUtils.js'
 
 const STATUTS = [
   { value: '',          label: 'Tous les statuts' },
@@ -360,6 +360,22 @@ export default function Dashboard() {
     )
   }
 
+  // Rassemble les donnees actuellement affichees dans la vue Performance
+  // (cartes KPI + tableaux/graphiques) pour l'export PDF/Excel.
+  const getAnalyticsExportPayload = () => ({
+    kpis: getKPIs().map(k => ({ label: k.label, value: k.value })),
+    agences: analyticsData.agences,
+    processus: analyticsData.processus,
+    evolution: analyticsData.evolution,
+    meta: {
+      agenceLabel: user?.role === 'coordonnateur'
+        ? (coordAgence ? (agencesList.find(a => a.id == coordAgence)?.nom || 'Agence sélectionnée') : 'Toutes les agences')
+        : (user?.agence_nom || 'Toutes les agences'),
+      roleLabel: ROLE_LABELS[user?.role] || user?.role,
+      generatedBy: `${user?.prenoms || ''} ${user?.nom || ''}`.trim(),
+    },
+  })
+
   const renderAnalytics = () => {
     const { agences, processus, evolution } = analyticsData
 
@@ -607,6 +623,26 @@ export default function Dashboard() {
               >
                 <List className="w-4 h-4" />
                 Opérations
+              </button>
+            </div>
+          )}
+          {view === 'analytics' && ['coordonnateur', 'administrateur_fonctionnel'].includes(user?.role) && (
+            <div className="flex gap-2">
+              <button
+                onClick={() => exportAnalyticsToExcel(getAnalyticsExportPayload())}
+                title="Exporter le rapport de performance en Excel"
+                className="flex items-center gap-2 px-3 py-2 bg-green-50 text-green-700 hover:bg-green-100 rounded-lg text-xs font-bold border border-green-200 transition-colors"
+              >
+                <FileText className="w-4 h-4" />
+                Excel
+              </button>
+              <button
+                onClick={() => exportAnalyticsToPDF(getAnalyticsExportPayload())}
+                title="Exporter le rapport de performance en PDF"
+                className="flex items-center gap-2 px-3 py-2 bg-red-50 text-red-700 hover:bg-red-100 rounded-lg text-xs font-bold border border-red-200 transition-colors"
+              >
+                <FileText className="w-4 h-4" />
+                PDF
               </button>
             </div>
           )}
