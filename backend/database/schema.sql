@@ -294,6 +294,23 @@ CREATE TRIGGER trg_kb_entries_updated_at
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- ============================================================
+-- 11bis. PIÈCES JOINTES
+-- ============================================================
+CREATE TABLE pieces_jointes (
+    id              SERIAL PRIMARY KEY,
+    reclamation_id  INTEGER      NOT NULL REFERENCES reclamations(id) ON DELETE CASCADE,
+    nom_original    VARCHAR(255) NOT NULL,
+    nom_stockage    VARCHAR(255) NOT NULL,
+    type_mime       VARCHAR(150) NOT NULL,
+    taille          INTEGER      NOT NULL,
+    chemin          VARCHAR(500) NOT NULL,
+    cree_par        INTEGER      REFERENCES utilisateurs(id) ON DELETE SET NULL,
+    date_creation   TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_pieces_jointes_reclamation ON pieces_jointes(reclamation_id);
+
+-- ============================================================
 -- 12. ACTIONS DE TRAITEMENT
 -- ============================================================
 CREATE TABLE actions_traitement (
