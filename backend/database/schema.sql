@@ -351,3 +351,13 @@ CREATE TABLE notifications (
 
 CREATE INDEX idx_notifications_user_lu   ON notifications(utilisateur_id, lu);
 CREATE INDEX idx_notifications_user_date ON notifications(utilisateur_id, date_creation DESC);
+
+-- ============================================================
+-- 15. OBJECTIFS SLA (parametrage du tableau de bord)
+-- ============================================================
+CREATE TABLE parametres_objectifs (
+    id                      SERIAL PRIMARY KEY,
+    objectif_traitement_pct NUMERIC(5,2) NOT NULL DEFAULT 90,
+    objectif_delai_pct      NUMERIC(5,2) NOT NULL DEFAULT 90,
+    updated_at              TIMESTAMP NOT NULL DEFAULT NOW()
+);

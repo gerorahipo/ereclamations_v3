@@ -58,11 +58,19 @@ INSERT INTO utilisateurs (ressource_id, email, password, role) VALUES
     (9, 'pilote.yopougon@cnps.ci','$2y$10$YyFv8CKTXAI3ZDBUkYs5Pea6eRxY/0sN0QNECVyoMQFfksImVvCGe', 'pilote');
 
 -- ─── PROCESSUS CNPS ─────────────────────────────────────────
+-- 'NQ' est le processus de repli utilise pour les reclamations deposees
+-- sur le portail public tant qu'elles n'ont pas ete qualifiees par
+-- l'Agence Digitale (voir PublicController::submit).
 INSERT INTO processus (code, libelle) VALUES
     ('GRC',     'Gestion des Réclamations Clients'),
     ('GDAV',    'Gestion des Droits Vieillesse (Retraite)'),
     ('PF',      'Prestations Familiales'),
-    ('ATMP',    'Accidents du Travail et Maternité');
+    ('ATMP',    'Accidents du Travail et Maternité'),
+    ('NQ',      'Non Qualifié');
+
+-- ─── OBJECTIFS SLA (valeurs par defaut du tableau de bord) ───
+INSERT INTO parametres_objectifs (objectif_traitement_pct, objectif_delai_pct)
+VALUES (90, 90);
 
 -- ─── MOTIFS ─────────────────────────────────────────────────
 INSERT INTO motifs (regime_id, type_client_id, libelle) VALUES
