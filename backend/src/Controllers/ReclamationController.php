@@ -446,7 +446,7 @@ class ReclamationController
                     echo json_encode(['error' => 'Accès non autorisé']);
                     return;
                 }
-            } elseif ($user['role'] === 'manager') {
+            } elseif ($user['role'] === 'manager' || $user['role'] === 'superviseur') {
                 if ($rec['agence_id'] != $user['agence_id'] && $rec['agence_origine_id'] != $user['agence_id']) {
                     http_response_code(403);
                     echo json_encode(['error' => 'Accès non autorisé']);
@@ -992,7 +992,7 @@ class ReclamationController
     }
 
     // ─── Helper: vérification des droits sur la réclamation ──
-    private function checkAccess($pdo, int $reclamationId, array $user): bool
+    public function checkAccess($pdo, int $reclamationId, array $user): bool
     {
         if (in_array($user['role'], ['coordonnateur', 'administrateur_fonctionnel', 'administrateur_systeme'], true)) {
             return true;

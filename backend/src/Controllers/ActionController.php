@@ -14,10 +14,31 @@ use App\Utils\Audit;
 
 class ActionController
 {
+    private function checkAccess($pdo, int $reclamationId, array $user): bool
+    {
+        return (new ReclamationController())->checkAccess($pdo, $reclamationId, $user);
+    }
+
+    /** Récupère l'id de réclamation associé à une action, ou null si introuvable. */
+    private function reclamationIdForAction($pdo, int $actionId): ?int
+    {
+        $stmt = $pdo->prepare("SELECT reclamation_id FROM actions_traitement WHERE id = :id");
+        $stmt->execute([':id' => $actionId]);
+        $recId = $stmt->fetchColumn();
+        return $recId !== false ? (int)$recId : null;
+    }
+
     public function index(int $recId): void
     {
         Auth::require();
-        $pdo = Database::getConnection();
+        $pdo  = Database::getConnection();
+        $user = Auth::$user;
+
+        if (!$this->checkAccess($pdo, $recId, $user)) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Accès non autorisé pour cette réclamation']);
+            return;
+        }
 
         $stmt = $pdo->prepare("
             SELECT at.*, a.nom AS ressource_nom
@@ -35,6 +56,15 @@ class ActionController
     {
         Auth::requireRole(['pilote']);
 
+        $pdo  = Database::getConnection();
+        $user = Auth::$user;
+
+        if (!$this->checkAccess($pdo, $recId, $user)) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Accès non autorisé pour cette réclamation']);
+            return;
+        }
+
         $data = json_decode(file_get_contents('php://input'), true);
         $libelle = trim($data['libelle'] ?? '');
 
@@ -43,9 +73,6 @@ class ActionController
             echo json_encode(['error' => 'Le libellé de l\'action est requis']);
             return;
         }
-
-        $pdo  = Database::getConnection();
-        $user = Auth::$user;
 
         $stmt = $pdo->prepare("
             INSERT INTO actions_traitement
@@ -80,9 +107,22 @@ class ActionController
     {
         Auth::requireRole(['pilote']);
 
-        $data = json_decode(file_get_contents('php://input'), true);
         $pdo  = Database::getConnection();
         $user = Auth::$user;
+
+        $recId = $this->reclamationIdForAction($pdo, $actionId);
+        if ($recId === null) {
+            http_response_code(404);
+            echo json_encode(['error' => "Action #{$actionId} non trouvée"]);
+            return;
+        }
+        if (!$this->checkAccess($pdo, $recId, $user)) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Accès non autorisé pour cette réclamation']);
+            return;
+        }
+
+        $data = json_decode(file_get_contents('php://input'), true);
 
         $fields = [];
         $params = [':id' => $actionId];
@@ -148,6 +188,12 @@ class ActionController
         if (!$action) {
             http_response_code(404);
             echo json_encode(['error' => "Action #{$actionId} non trouvée"]);
+            return;
+        }
+
+        if (!$this->checkAccess($pdo, (int)$action['reclamation_id'], $user)) {
+            http_response_code(403);
+            echo json_encode(['error' => 'Accès non autorisé pour cette réclamation']);
             return;
         }
 

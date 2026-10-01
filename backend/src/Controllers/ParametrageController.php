@@ -1343,11 +1343,20 @@ class ParametrageController
     {
         Auth::requireRole(['administrateur_fonctionnel', 'administrateur_systeme']);
         $pdo = Database::getConnection();
-        
+
         $allowedTables = ['processus', 'motifs', 'sous_motifs', 'regimes', 'types_clients', 'agences', 'ressources', 'utilisateurs', 'categories_causes', 'causes', 'affectations_pilotes', 'modes_saisine', 'travailleurs', 'employeurs', 'sinistres'];
         if (!in_array($table, $allowedTables)) {
             http_response_code(400);
             echo json_encode(['error' => 'Table non autorisée']);
+            return;
+        }
+
+        // Ces tables sensibles ne peuvent être supprimées que par un administrateur système,
+        // en cohérence avec leur création/modification (createUtilisateur/updateAgence/createRessource...).
+        $systemOnlyTables = ['utilisateurs', 'agences', 'ressources'];
+        if (in_array($table, $systemOnlyTables) && Auth::role() !== 'administrateur_systeme') {
+            http_response_code(403);
+            echo json_encode(['error' => 'Seul un administrateur système peut supprimer cet élément']);
             return;
         }
         if ($table === 'ressources') {
