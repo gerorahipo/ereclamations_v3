@@ -378,3 +378,38 @@ CREATE TABLE parametres_objectifs (
     objectif_delai_pct      NUMERIC(5,2) NOT NULL DEFAULT 90,
     updated_at              TIMESTAMP NOT NULL DEFAULT NOW()
 );
+
+-- ============================================================
+-- 16. INTERIMS (delegation temporaire d'acces a une autre agence)
+-- Lue a chaque connexion (AuthController) et geree par InterimController.
+-- ============================================================
+CREATE TABLE interims (
+    id          SERIAL PRIMARY KEY,
+    user_id     INTEGER   NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+    agence_id   INTEGER   NOT NULL REFERENCES agences(id) ON DELETE CASCADE,
+    date_debut  DATE      NOT NULL,
+    date_fin    DATE      NOT NULL,
+    actif       BOOLEAN   NOT NULL DEFAULT TRUE,
+    created_at  TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX idx_interims_user        ON interims(user_id);
+CREATE INDEX idx_interims_agence      ON interims(agence_id);
+CREATE INDEX idx_interims_user_active ON interims(user_id, actif) WHERE actif IS TRUE;
+
+-- ============================================================
+-- 17. CONFIGURATION MAIL (SMTP) — une seule ligne
+-- Utilisee par ConfigMailModel / MailService.
+-- ============================================================
+CREATE TABLE config_mail (
+    id          SERIAL PRIMARY KEY,
+    host        VARCHAR(255) NOT NULL,
+    port        INTEGER      NOT NULL,
+    username    VARCHAR(255),
+    password    VARCHAR(255),
+    encryption  VARCHAR(20),
+    from_email  VARCHAR(255) NOT NULL,
+    from_name   VARCHAR(255) NOT NULL,
+    is_active   BOOLEAN      NOT NULL DEFAULT TRUE,
+    updated_at  TIMESTAMP    NOT NULL DEFAULT NOW()
+);

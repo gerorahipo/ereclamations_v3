@@ -7,6 +7,8 @@
 --   2. Processus NQ           (processus de repli "Non Qualifie")
 --   3. parametres_objectifs   (objectifs SLA du tableau de bord)
 --   4. pieces_jointes         (metadonnees des pieces jointes)
+--   5. interims               (delegation d'agence, lue a chaque login)
+--   6. config_mail            (configuration SMTP)
 --
 -- Idempotent : reexecutable sans risque (aucune donnee existante
 -- n'est modifiee ni supprimee).
@@ -96,10 +98,41 @@ CREATE TABLE IF NOT EXISTS pieces_jointes (
 
 CREATE INDEX IF NOT EXISTS idx_pieces_jointes_reclamation ON pieces_jointes(reclamation_id);
 
+-- 5. Interims -----------------------------------------------------
+CREATE TABLE IF NOT EXISTS interims (
+    id          SERIAL PRIMARY KEY,
+    user_id     INTEGER   NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
+    agence_id   INTEGER   NOT NULL REFERENCES agences(id) ON DELETE CASCADE,
+    date_debut  DATE      NOT NULL,
+    date_fin    DATE      NOT NULL,
+    actif       BOOLEAN   NOT NULL DEFAULT TRUE,
+    created_at  TIMESTAMP NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_interims_user        ON interims(user_id);
+CREATE INDEX IF NOT EXISTS idx_interims_agence      ON interims(agence_id);
+CREATE INDEX IF NOT EXISTS idx_interims_user_active ON interims(user_id, actif) WHERE actif IS TRUE;
+
+-- 6. Configuration mail (SMTP) ------------------------------------
+CREATE TABLE IF NOT EXISTS config_mail (
+    id          SERIAL PRIMARY KEY,
+    host        VARCHAR(255) NOT NULL,
+    port        INTEGER      NOT NULL,
+    username    VARCHAR(255),
+    password    VARCHAR(255),
+    encryption  VARCHAR(20),
+    from_email  VARCHAR(255) NOT NULL,
+    from_name   VARCHAR(255) NOT NULL,
+    is_active   BOOLEAN      NOT NULL DEFAULT TRUE,
+    updated_at  TIMESTAMP    NOT NULL DEFAULT NOW()
+);
+
 COMMIT;
 
 -- Verification ------------------------------------------------------
 SELECT id, code, nom, type FROM agences WHERE nom ILIKE '%digitale%';
 SELECT id, code, libelle   FROM processus WHERE code = 'NQ';
 SELECT * FROM parametres_objectifs;
-SELECT to_regclass('public.pieces_jointes') AS table_pieces_jointes;
+SELECT to_regclass('public.pieces_jointes') AS pieces_jointes,
+       to_regclass('public.interims')       AS interims,
+       to_regclass('public.config_mail')    AS config_mail;
