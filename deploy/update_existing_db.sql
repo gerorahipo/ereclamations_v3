@@ -15,15 +15,53 @@
 --   psql -h <HOTE> -U <USER> -d <BASE> -f update_existing_db.sql
 -- ============================================================
 
+\set ON_ERROR_STOP on
+
 BEGIN;
 
 -- 1. Agence Digitale ------------------------------------------------
--- Le code applicatif la retrouve par son nom (ILIKE '%digitale%').
-INSERT INTO agences (nom, code, type, actif)
-SELECT 'Agence Digitale', 'ADG', 'agence', TRUE
-WHERE NOT EXISTS (
-    SELECT 1 FROM agences WHERE nom ILIKE '%digitale%' OR code = 'ADG'
-);
+-- Creee avec l'id 6 EXPLICITE (le code applicatif actuel en depend).
+--   - deja presente (code ADG ou nom "digitale") : rien n'est cree ; un
+--     avertissement est affiche si son id n'est pas 6, et son code est
+--     aligne sur 'ADG' si besoin.
+--   - id 6 deja occupe par une autre agence : le script s'arrete et
+--     annule tout (aucune modification).
+--   - la sequence agences_id_seq est resynchronisee pour que les
+--     prochaines agences creees n'entrent pas en collision avec l'id 6.
+DO $$
+DECLARE
+    v_id      INTEGER;
+    v_code    VARCHAR;
+    v_occupant VARCHAR;
+BEGIN
+    SELECT id, code INTO v_id, v_code
+    FROM agences
+    WHERE code = 'ADG' OR nom ILIKE '%digitale%'
+    ORDER BY (code = 'ADG') DESC, id
+    LIMIT 1;
+
+    IF v_id IS NOT NULL THEN
+        IF v_id <> 6 THEN
+            RAISE WARNING 'Agence Digitale deja presente avec id=% (attendu: 6). Aucune creation.', v_id;
+        ELSE
+            RAISE NOTICE 'Agence Digitale deja presente (id=6). Aucune creation.';
+        END IF;
+        IF v_code <> 'ADG' AND NOT EXISTS (SELECT 1 FROM agences WHERE code = 'ADG') THEN
+            UPDATE agences SET code = 'ADG' WHERE id = v_id;
+            RAISE NOTICE 'Code de l''agence id=% aligne sur ADG.', v_id;
+        END IF;
+    ELSE
+        SELECT nom INTO v_occupant FROM agences WHERE id = 6;
+        IF v_occupant IS NOT NULL THEN
+            RAISE EXCEPTION 'Creation impossible : l''id 6 est deja occupe par l''agence "%". Aucune modification appliquee.', v_occupant;
+        END IF;
+        INSERT INTO agences (id, nom, code, type, actif)
+        VALUES (6, 'Agence Digitale', 'ADG', 'agence', TRUE);
+        RAISE NOTICE 'Agence Digitale creee (id=6, code=ADG).';
+    END IF;
+
+    PERFORM setval(pg_get_serial_sequence('agences', 'id'), (SELECT MAX(id) FROM agences));
+END $$;
 
 -- 2. Processus de repli "Non Qualifie" ------------------------------
 -- Requis par PublicController::submit (reclamations du portail public).
