@@ -8,7 +8,8 @@ INSERT INTO agences (nom, code, type) VALUES
     ('Direction Générale - Centrale',      'DG',    'centrale'),
     ('Agence Plateau',                     'AGP',   'agence'),
     ('Agence Marcory',                     'AGM',   'agence'),
-    ('Agence Yopougon',                    'AGY',   'agence');
+    ('Agence Yopougon',                    'AGY',   'agence'),
+    ('Agence Digitale',                    'ADG',   'agence');
 
 -- ─── RÉGIMES ────────────────────────────────────────────────
 INSERT INTO regimes (libelle) VALUES 
