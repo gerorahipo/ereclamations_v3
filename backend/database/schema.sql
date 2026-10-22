@@ -49,9 +49,10 @@ CREATE TABLE utilisateurs (
 -- 4. PARAMÉTRAGE MÉTIER (Régimes, Clients, Saisines)
 -- ============================================================
 CREATE TABLE regimes (
-    id      SERIAL PRIMARY KEY,
-    libelle VARCHAR(100) NOT NULL UNIQUE,
-    actif   BOOLEAN      NOT NULL DEFAULT TRUE
+    id            SERIAL PRIMARY KEY,
+    libelle       VARCHAR(100) NOT NULL UNIQUE,
+    actif         BOOLEAN      NOT NULL DEFAULT TRUE,
+    has_employeur BOOLEAN      NOT NULL DEFAULT TRUE
 );
 
 CREATE TABLE types_clients (
@@ -82,6 +83,7 @@ CREATE TABLE processus (
 -- ============================================================
 CREATE TABLE motifs (
     id              SERIAL PRIMARY KEY,
+    processus_id    INTEGER      REFERENCES processus(id) ON DELETE CASCADE,
     regime_id       INTEGER      REFERENCES regimes(id) ON DELETE SET NULL,
     type_client_id  INTEGER      REFERENCES types_clients(id) ON DELETE SET NULL,
     libelle         VARCHAR(300) NOT NULL,
@@ -239,6 +241,10 @@ CREATE TABLE reclamations (
     agent_createur_id INTEGER      NOT NULL REFERENCES utilisateurs(id) ON DELETE RESTRICT,
     pilote_id         INTEGER      REFERENCES utilisateurs(id) ON DELETE SET NULL,
     agence_id         INTEGER      NOT NULL REFERENCES agences(id) ON DELETE RESTRICT,
+    agence_origine_id INTEGER      NOT NULL REFERENCES agences(id) ON DELETE CASCADE,
+    commentaire_agent      TEXT,
+    analyse_commentaire    TEXT,
+    remarques_coordination TEXT,
     date_creation     TIMESTAMP    NOT NULL DEFAULT NOW(),
     date_echeance_sla TIMESTAMP    NOT NULL,
     date_resolution   TIMESTAMP,
@@ -322,6 +328,7 @@ CREATE TABLE actions_traitement (
     statut          VARCHAR(30)  NOT NULL DEFAULT 'en_attente'
                       CHECK (statut IN ('en_attente', 'en_cours', 'termine')),
     observations    TEXT,
+    commentaire_cloture TEXT,
     created_at      TIMESTAMP    NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMP    NOT NULL DEFAULT NOW()
 );

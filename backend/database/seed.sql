@@ -187,6 +187,6 @@ INSERT INTO reclamations (
     partenaire_type, partenaire_id, partenaire_nom, 
     regime_id, type_client_id, mode_saisine_id, 
     processus_id, motif_id, sous_motif_id, 
-    description, statut, agent_createur_id, pilote_id, agence_id, date_creation
+    description, statut, agent_createur_id, pilote_id, agence_id, agence_origine_id, date_creation
 ) VALUES
-    ('entreprise', 1, 'SOCIÉTÉ INDUSTRIELLE', 1, 1, 1, 1, 1, 1, 'Test description', 'en_cours', 4, 3, 2, NOW() - INTERVAL '1 day');
+    ('entreprise', 1, 'SOCIÉTÉ INDUSTRIELLE', 1, 1, 1, 1, 1, 1, 'Test description', 'en_cours', 4, 3, 2, 2, NOW() - INTERVAL '1 day');

@@ -9,6 +9,9 @@
 --   4. pieces_jointes         (metadonnees des pieces jointes)
 --   5. interims               (delegation d'agence, lue a chaque login)
 --   6. config_mail            (configuration SMTP)
+--   7. 7 colonnes absentes de l'ancien schema.sql, dont
+--      reclamations.agence_origine_id (requise par POST /api/public/declare :
+--      son absence provoque un HTTP 500 sur le portail client)
 --
 -- Idempotent : reexecutable sans risque (aucune donnee existante
 -- n'est modifiee ni supprimee).
@@ -126,6 +129,20 @@ CREATE TABLE IF NOT EXISTS config_mail (
     is_active   BOOLEAN      NOT NULL DEFAULT TRUE,
     updated_at  TIMESTAMP    NOT NULL DEFAULT NOW()
 );
+
+-- 7. Colonnes manquantes -------------------------------------------
+ALTER TABLE regimes            ADD COLUMN IF NOT EXISTS has_employeur BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE motifs             ADD COLUMN IF NOT EXISTS processus_id INTEGER REFERENCES processus(id) ON DELETE CASCADE;
+ALTER TABLE actions_traitement ADD COLUMN IF NOT EXISTS commentaire_cloture TEXT;
+ALTER TABLE reclamations       ADD COLUMN IF NOT EXISTS commentaire_agent      TEXT;
+ALTER TABLE reclamations       ADD COLUMN IF NOT EXISTS analyse_commentaire    TEXT;
+ALTER TABLE reclamations       ADD COLUMN IF NOT EXISTS remarques_coordination TEXT;
+
+-- agence_origine_id est NOT NULL : ajout nullable, remplissage des dossiers
+-- existants (origine = agence courante), puis verrouillage.
+ALTER TABLE reclamations ADD COLUMN IF NOT EXISTS agence_origine_id INTEGER REFERENCES agences(id) ON DELETE CASCADE;
+UPDATE reclamations SET agence_origine_id = agence_id WHERE agence_origine_id IS NULL;
+ALTER TABLE reclamations ALTER COLUMN agence_origine_id SET NOT NULL;
 
 COMMIT;
 
