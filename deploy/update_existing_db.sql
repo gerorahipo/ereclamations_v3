@@ -12,6 +12,8 @@
 --   7. 7 colonnes absentes de l'ancien schema.sql, dont
 --      reclamations.agence_origine_id (requise par POST /api/public/declare :
 --      son absence provoque un HTTP 500 sur le portail client)
+--   8. Mode de saisine "Portail Web" (sans lui, POST /api/public/declare
+--      envoie mode_saisine_id = NULL : violation NOT NULL, HTTP 500)
 --
 -- Idempotent : reexecutable sans risque (aucune donnee existante
 -- n'est modifiee ni supprimee).
@@ -143,6 +145,15 @@ ALTER TABLE reclamations       ADD COLUMN IF NOT EXISTS remarques_coordination T
 ALTER TABLE reclamations ADD COLUMN IF NOT EXISTS agence_origine_id INTEGER REFERENCES agences(id) ON DELETE CASCADE;
 UPDATE reclamations SET agence_origine_id = agence_id WHERE agence_origine_id IS NULL;
 ALTER TABLE reclamations ALTER COLUMN agence_origine_id SET NOT NULL;
+
+-- 8. Mode de saisine du portail public -----------------------------
+-- Le portail cherche un mode dont le libelle contient 'Portail' ou 'Web'
+-- (PublicController::submit). Cree seulement s'il n'en existe aucun.
+INSERT INTO modes_saisine (libelle, actif)
+SELECT 'Portail Web', TRUE
+WHERE NOT EXISTS (
+    SELECT 1 FROM modes_saisine WHERE libelle ILIKE '%Portail%' OR libelle ILIKE '%Web%'
+);
 
 COMMIT;
 
