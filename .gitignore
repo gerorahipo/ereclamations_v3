@@ -27,3 +27,8 @@ Thumbs.db
 # ── Sauvegardes locales (dumps DB, etc.) ──
 backups/
 deploy/__pycache__/
+
+# ── Imports de donnees (contiennent des donnees personnelles) ──
+import_reclamations*.sql
+deploy/import_*.sql
+*.xlsx
