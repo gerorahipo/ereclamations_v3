@@ -226,6 +226,7 @@ SQL_TEMPLATE = r"""-- ==========================================================
 -- {total} lignes. Genere par deploy/import_reclamations.py
 -- Contient des donnees personnelles : ne pas versionner / diffuser.
 -- ============================================================
+SET client_encoding = 'UTF8';  -- evite les accents mal decodes (psql sous Windows)
 BEGIN;
 
 CREATE FUNCTION pg_temp.norm(t text) RETURNS text AS $f$
