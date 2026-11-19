@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-"""Support de formation e-Reclamations (PPTX) - generateur."""
-import os, sys
+"""Support de formation e-Reclamations - version modele CNPS (EXEMPLE.pptx)."""
+import os, sys, copy
 from PIL import Image
 from pptx import Presentation
 from pptx.util import Inches, Pt, Emu
@@ -9,41 +9,37 @@ from pptx.enum.shapes import MSO_SHAPE
 from pptx.enum.text import PP_ALIGN, MSO_ANCHOR
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-OUT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(HERE, "Support_formation_e-Reclamations.pptx")
-CROPS = os.path.join(HERE, "crops"); os.makedirs(CROPS, exist_ok=True)
+TEMPLATE = sys.argv[1]
+OUT = sys.argv[2]
 
-NAVY = RGBColor(0x00, 0x33, 0x66); BLUE = RGBColor(0x00, 0x4A, 0x99); ORANGE = RGBColor(0xF3, 0x86, 0x1D)
-LIGHT = RGBColor(0xF1, 0xF5, 0xFA); WHITE = RGBColor(0xFF, 0xFF, 0xFF); DARK = RGBColor(0x1F, 0x29, 0x37)
-GRAY = RGBColor(0x6B, 0x72, 0x80); GREEN = RGBColor(0x05, 0x96, 0x69); RED = RGBColor(0xDC, 0x26, 0x26)
-PALE_ORANGE = RGBColor(0xFF, 0xF4, 0xE8); PALE_BLUE = RGBColor(0xE6, 0xEE, 0xF8)
-FONT = "Calibri"
+BLUE = RGBColor(0x1F, 0x3A, 0x93); ORANGE = RGBColor(0xFF, 0x6B, 0x35); DARK = RGBColor(0x1F, 0x29, 0x37)
+GRAY = RGBColor(0x5B, 0x65, 0x75); LIGHT = RGBColor(0xF5, 0xF7, 0xFA); WHITE = RGBColor(0xFF, 0xFF, 0xFF)
+GREEN = RGBColor(0x05, 0x96, 0x69); RED = RGBColor(0xDC, 0x26, 0x26); PALE = RGBColor(0xFF, 0xF1, 0xEA)
+LINE = RGBColor(0xD5, 0xDB, 0xE5)
+BODY = "Century Gothic"
+
+prs = Presentation(TEMPLATE)
+# supprimer les diapositives d'exemple
+sldIdLst = prs.slides._sldIdLst
+for sldId in list(sldIdLst):
+    prs.part.drop_rel(sldId.rId); sldIdLst.remove(sldId)
+LAY = [m.slide_layouts[0] for m in prs.slide_masters]   # 0 titre, 1 sommaire, 2 section, 3 contenu, 4 merci
 
 
-from PIL import ImageDraw, ImageFont
-def _f(sz,b=False):
-    for n in (["arialbd.ttf"] if b else ["arial.ttf"]):
-        try: return ImageFont.truetype(n,sz)
-        except Exception: pass
-    return ImageFont.load_default()
-def mock_modal(name, title, fields, button, btn_color=(0,74,153)):
-    """Les modales n'ont pas ete rendues par la capture : reconstitution fidele des libelles."""
-    im=Image.open(os.path.join(HERE,name+".png")).convert("RGB"); d=ImageDraw.Draw(im)
-    x0,y0,x1=440,150,840; h=70+len(fields)*95+70; y1=y0+h
-    d.rounded_rectangle((x0,y0,x1,y1),14,fill=(255,255,255),outline=(200,208,220),width=2)
-    d.text((x0+24,y0+22),title,font=_f(20,True),fill=(0,51,102))
-    y=y0+70
-    for lab,val,tall in fields:
-        d.text((x0+24,y),lab,font=_f(12,True),fill=(107,114,128))
-        d.rounded_rectangle((x0+24,y+20,x1-24,y+62),6,fill=(246,248,251),outline=(200,208,220))
-        d.text((x0+34,y+33),val,font=_f(13),fill=(31,41,55)); y+=95
-    d.rounded_rectangle((x1-24-190,y1-62,x1-24,y1-20),8,fill=btn_color)
-    d.text((x1-24-190+14,y1-50),button,font=_f(14,True),fill=(255,255,255))
-    im.save(os.path.join(HERE,name+"_m.png"))
-    return name+"_m", y0, y1
+def clean(s):
+    for ph in list(s.placeholders):
+        if ph.has_text_frame and not ph.text_frame.text.strip():
+            ph._element.getparent().remove(ph._element)
 
-prs = Presentation(); prs.slide_width = Inches(13.333); prs.slide_height = Inches(7.5)
-BLANK = prs.slide_layouts[6]
-counter = {"n": 0}
+
+def ph(s, idx):
+    for p in s.placeholders:
+        if p.placeholder_format.idx == idx:
+            return p
+
+
+def settext(p, t):
+    p.text_frame.text = t
 
 
 def rect(s, x, y, w, h, fill=None, line=None, shape=MSO_SHAPE.RECTANGLE, lw=0.75):
@@ -56,7 +52,7 @@ def rect(s, x, y, w, h, fill=None, line=None, shape=MSO_SHAPE.RECTANGLE, lw=0.75
     return sh
 
 
-def text(s, x, y, w, h, content, size=14, bold=False, color=DARK, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.TOP, italic=False):
+def text(s, x, y, w, h, content, size=14, bold=False, color=DARK, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.TOP):
     tb = s.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(h))
     tf = tb.text_frame; tf.word_wrap = True; tf.vertical_anchor = anchor
     tf.margin_left = tf.margin_right = Inches(0.05); tf.margin_top = tf.margin_bottom = Inches(0.03)
@@ -68,613 +64,423 @@ def text(s, x, y, w, h, content, size=14, bold=False, color=DARK, align=PP_ALIGN
         for r in runs:
             t, o = (r, {}) if isinstance(r, str) else r
             run = para.add_run(); run.text = t
-            f = run.font; f.name = FONT; f.size = Pt(o.get("size", size)); f.bold = o.get("bold", bold)
-            f.italic = o.get("italic", italic); f.color.rgb = o.get("color", color)
-        para.space_after = Pt(4)
+            f = run.font; f.name = o.get("font", BODY); f.size = Pt(o.get("size", size)); f.bold = o.get("bold", bold)
+            f.color.rgb = o.get("color", color)
+        para.space_after = Pt(5)
     return tb
 
 
-def notes(s, t):
-    s.notes_slide.notes_text_frame.text = t
-
-
-def base(title, tag=None):
-    counter["n"] += 1
-    s = prs.slides.add_slide(BLANK)
-    rect(s, 0, 0, 13.333, 0.95, NAVY); rect(s, 0, 0.95, 13.333, 0.05, ORANGE)
-    text(s, 0.45, 0.12, 10.2, 0.75, title, size=26, bold=True, color=WHITE, anchor=MSO_ANCHOR.MIDDLE)
-    if tag:
-        pill = rect(s, 10.75, 0.27, 2.2, 0.42, ORANGE, shape=MSO_SHAPE.ROUNDED_RECTANGLE)
-        pill.adjustments[0] = 0.5
-        text(s, 10.75, 0.27, 2.2, 0.42, tag, size=12, bold=True, color=WHITE, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
-    text(s, 0.45, 7.1, 8, 0.3, "e-Réclamations — Support de formation  |  CNPS Côte d'Ivoire", size=10, color=GRAY)
-    text(s, 12.0, 7.1, 0.9, 0.3, str(counter["n"]), size=10, color=GRAY, align=PP_ALIGN.RIGHT)
-    return s
-
-
-def marker(s, n, cx, cy, r=0.17):
-    c = rect(s, cx - r, cy - r, 2 * r, 2 * r, ORANGE, WHITE, MSO_SHAPE.OVAL, lw=1.5)
+def badge(s, n, cx, cy, d=0.3, fill=ORANGE, size=12):
+    c = rect(s, cx - d / 2, cy - d / 2, d, d, fill, WHITE, MSO_SHAPE.OVAL, lw=1.25)
     tf = c.text_frame; tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
     tf.vertical_anchor = MSO_ANCHOR.MIDDLE
     p = tf.paragraphs[0]; p.alignment = PP_ALIGN.CENTER
-    run = p.add_run(); run.text = str(n); run.font.size = Pt(12); run.font.bold = True
-    run.font.color.rgb = WHITE; run.font.name = FONT
+    r = p.add_run(); r.text = str(n); r.font.size = Pt(size); r.font.bold = True; r.font.color.rgb = WHITE; r.font.name = BODY
+    return c
 
 
-def picture(s, name, box, marks=None, crop=None):
+from lxml import etree
+def notes(s, t):
+    ns = s.notes_slide
+    if ns.notes_text_frame is None:
+        xml = ('<p:sp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main">'
+               '<p:nvSpPr><p:cNvPr id="99" name="Notes Placeholder"/><p:cNvSpPr><a:spLocks noGrp="1"/></p:cNvSpPr><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr>'
+               '<p:spPr><a:xfrm><a:off x="685800" y="4400550"/><a:ext cx="5486400" cy="3600450"/></a:xfrm></p:spPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang="fr-FR"/></a:p></p:txBody></p:sp>')
+        ns.shapes._spTree.append(etree.fromstring(xml))
+    ns.notes_text_frame.text = t
+
+
+counter = {"n": 0}
+
+
+def content(part, title, sub, note=""):
+    counter["n"] += 1
+    s = prs.slides.add_slide(LAY[3])
+    short = {"INTRODUCTION": "INTRO", "ASSISTANCE": "AIDE", "CONCLUSION": "FIN"}
+    if " · " in part:
+        part, extra = part.split(" · ", 1); sub = extra.capitalize() + " — " + sub
+    part = short.get(part, part)
+    settext(ph(s, 0), title); settext(ph(s, 12), part); settext(ph(s, 11), sub)
+    clean(s); notes(s, note)
+    return s
+
+
+def section(num, title, sub, note=""):
+    counter["n"] += 1
+    s = prs.slides.add_slide(LAY[2])
+    settext(ph(s, 11), "MODULE " + num); settext(ph(s, 12), sub); settext(ph(s, 0), title)
+    clean(s); notes(s, note)
+    return s
+
+
+def picture(s, name, box, marks=None):
     path = os.path.join(HERE, name + ".png")
-    im = Image.open(path).convert("RGB")
-    ox, oy = 0, 0
-    if crop:
-        im = im.crop(crop); ox, oy = crop[0], crop[1]
-        path = os.path.join(CROPS, name + "_c.png"); im.save(path)
-    bx, by, bw, bh = box; iw, ih = im.size
+    im = Image.open(path); iw, ih = im.size
+    bx, by, bw, bh = box
     sc = min(bw / iw, bh / ih); w, h = iw * sc, ih * sc
     x, y = bx + (bw - w) / 2, by + (bh - h) / 2
-    rect(s, x - 0.03, y - 0.03, w + 0.06, h + 0.06, WHITE, RGBColor(0xC8, 0xD0, 0xDC), lw=1)
+    rect(s, x - 0.02, y - 0.02, w + 0.04, h + 0.04, WHITE, LINE, lw=1)
     s.shapes.add_picture(path, Inches(x), Inches(y), Inches(w), Inches(h))
-    for (n, px, py) in (marks or []):
-        marker(s, n, x + (px - ox) * sc, y + (py - oy) * sc)
+    for i, (x0, y0, x1, y1) in enumerate(marks or [], 1):      # cadre en repere 1000 x 625
+        rx, ry = x + x0 / 1000 * w, y + y0 / 625 * h
+        rw, rh = (x1 - x0) / 1000 * w, (y1 - y0) / 625 * h
+        rect(s, rx, ry, rw, rh, None, ORANGE, lw=2.25)
+        badge(s, i, rx, ry, d=0.27, size=11)
 
 
-def legend(s, items, x=9.0, y=1.25, w=3.95, tip=None, numbered=True, size=13):
+def legend(s, items, numbered, tip=None, x=9.4, y=1.25, w=3.55):
     cy = y
     for i, (head, desc) in enumerate(items, 1):
         if numbered:
-            c = rect(s, x, cy + 0.04, 0.34, 0.34, ORANGE, shape=MSO_SHAPE.OVAL)
-            tf = c.text_frame; tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
-            tf.vertical_anchor = MSO_ANCHOR.MIDDLE; p = tf.paragraphs[0]; p.alignment = PP_ALIGN.CENTER
-            r_ = p.add_run(); r_.text = str(i); r_.font.size = Pt(12); r_.font.bold = True; r_.font.color.rgb = WHITE; r_.font.name = FONT
-            tx = x + 0.45
+            badge(s, i, x + 0.15, cy + 0.17, d=0.3, size=11); tx = x + 0.42
         else:
-            rect(s, x, cy + 0.12, 0.1, 0.1, ORANGE, shape=MSO_SHAPE.OVAL); tx = x + 0.25
-        lines = max(1, int(len(desc) / 34) + 1)
-        hh = 0.3 + 0.2 * lines
-        text(s, tx, cy, w - (tx - x), hh, [[(head, {"bold": True, "color": NAVY, "size": size})],
-                                            [(desc, {"size": size - 2, "color": DARK})]] if desc else [[(head, {"bold": True, "color": NAVY, "size": size})]])
-        cy += hh + 0.06
+            rect(s, x + 0.03, cy + 0.1, 0.11, 0.11, ORANGE, shape=MSO_SHAPE.OVAL); tx = x + 0.25
+        lines = max(1, -(-len(desc) // 32)) if desc else 0
+        hh = 0.3 + 0.19 * lines
+        paras = [[(head, {"bold": True, "color": BLUE, "size": 13})]]
+        if desc: paras.append([(desc, {"size": 11, "color": GRAY})])
+        text(s, tx, cy, w - (tx - x), hh, paras)
+        cy += hh + 0.07
     if tip:
-        th = 0.35 + 0.19 * (int(len(tip) / 38) + 1)
-        ty = max(cy + 0.08, 6.9 - th)
-        rect(s, x - 0.05, ty, w + 0.1, th, PALE_ORANGE, ORANGE, MSO_SHAPE.ROUNDED_RECTANGLE).adjustments[0] = 0.08
-        text(s, x, ty + 0.04, w, th - 0.06, [[("À retenir  ", {"bold": True, "color": ORANGE, "size": 12})], [(tip, {"size": 12})]])
+        th = 0.55 + 0.18 * (-(-len(tip) // 36))
+        ty = max(cy + 0.1, 6.85 - th)
+        r = rect(s, x - 0.02, ty, w + 0.04, th, PALE, ORANGE, MSO_SHAPE.ROUNDED_RECTANGLE); r.adjustments[0] = 0.08
+        text(s, x + 0.05, ty + 0.04, w - 0.1, th - 0.06, [[("À retenir", {"bold": True, "color": ORANGE, "size": 12})], [(tip, {"size": 11})]])
 
 
-def shot_slide(title, tag, img, items, marks=None, crop=None, tip=None, note="", box=(0.45, 1.2, 8.35, 5.75), numbered=True):
-    s = base(title, tag)
-    picture(s, img, box, marks if numbered else None, crop)
-    legend(s, items, tip=tip, numbered=numbered)
-    notes(s, note)
+def shot(part, title, sub, img, items, marks=None, tip=None, note=""):
+    s = content(part, title, sub, note)
+    picture(s, img, (0.4, 1.2, 8.8, 5.6), marks)
+    legend(s, items, bool(marks), tip)
     return s
 
 
-def divider(num, title, subtitle, tag, note=""):
-    counter["n"] += 1
-    s = prs.slides.add_slide(BLANK)
-    rect(s, 0, 0, 13.333, 7.5, NAVY); rect(s, 0, 4.6, 13.333, 0.06, ORANGE)
-    text(s, 0.9, 1.5, 3.0, 2.2, num, size=120, bold=True, color=ORANGE)
-    text(s, 4.2, 1.9, 8.5, 1.3, title, size=44, bold=True, color=WHITE, anchor=MSO_ANCHOR.MIDDLE)
-    text(s, 4.2, 3.3, 8.5, 1.2, subtitle, size=20, color=RGBColor(0xC8, 0xD6, 0xEA))
-    text(s, 0.9, 5.0, 11, 0.6, tag, size=16, bold=True, color=ORANGE)
-    notes(s, note)
-    return s
+def card(s, x, y, w, h, head, body, color=BLUE, hs=17, bs=13):
+    r = rect(s, x, y, w, h, WHITE, LINE, MSO_SHAPE.ROUNDED_RECTANGLE); r.adjustments[0] = 0.04
+    rect(s, x, y, w, 0.1, color)
+    text(s, x + 0.15, y + 0.2, w - 0.3, 0.5, head, size=hs, bold=True, color=color)
+    text(s, x + 0.15, y + 0.75, w - 0.3, h - 0.85, body, size=bs)
 
 
-def card(s, x, y, w, h, head, body, color=BLUE, hs=16, bs=12):
-    rect(s, x, y, w, h, WHITE, RGBColor(0xC8, 0xD0, 0xDC), MSO_SHAPE.ROUNDED_RECTANGLE).adjustments[0] = 0.05
-    rect(s, x, y, w, 0.12, color)
-    text(s, x + 0.12, y + 0.2, w - 0.24, 0.5, head, size=hs, bold=True, color=color)
-    text(s, x + 0.12, y + 0.75, w - 0.24, h - 0.85, body, size=bs, color=DARK)
-
-
-# ========================================================================
-# 1. Titre
+# ======================== 1. Titre
 counter["n"] += 1
-s = prs.slides.add_slide(BLANK)
-rect(s, 0, 0, 13.333, 7.5, NAVY); rect(s, 0, 5.3, 13.333, 0.07, ORANGE)
-text(s, 0.8, 1.4, 11.5, 1.2, "Formation e-Réclamations", size=54, bold=True, color=WHITE)
-text(s, 0.8, 2.7, 11.5, 1.6, "Espace assuré  ·  Agent accueil et relations client  ·  Pilote  ·  Manager de service/section accueil réclamations",
-     size=24, color=RGBColor(0xC8, 0xD6, 0xEA))
-text(s, 0.8, 4.4, 11.5, 0.6, "Support de formation avec cas pratique complet", size=20, bold=True, color=ORANGE)
-text(s, 0.8, 5.6, 11.5, 0.9, ["Caisse Nationale de Prévoyance Sociale — Côte d'Ivoire",
-                              "Captures réalisées sur la plateforme de test (e-reclamation-test.cnps.ci)"], size=16, color=WHITE)
-notes(s, "Accueil des participants. Présenter l'objectif : à la fin de la session, chacun sait réaliser les actions de son profil et comprend le rôle des autres. "
-         "Préciser que les captures proviennent de la plateforme de TEST : les dossiers et noms affichés sont fictifs ou de démonstration.")
+s = prs.slides.add_slide(LAY[0])
+settext(ph(s, 0), "Formation e-Réclamations")
+settext(ph(s, 10), "Espace assuré · Agent · Pilote · Manager — avec cas pratique complet")
+clean(s)
+notes(s, "Accueil des participants. Objectif : à la fin de la session, chacun sait réaliser les actions de son profil et comprend le rôle des autres. "
+         "Les captures proviennent de la plateforme de TEST : dossiers et noms affichés sont fictifs.")
 
-# 2. Objectifs
-s = base("Objectifs et déroulé de la formation")
-card(s, 0.45, 1.3, 6.1, 5.5, "À l'issue de la formation, vous saurez",
-     ["•  Expliquer le circuit complet d'une réclamation, de la déclaration à la clôture",
-      "•  Accompagner un assuré sur le portail (déclarer et suivre)",
-      "•  Réaliser les actions de votre profil : agent, pilote ou manager",
-      "•  Comprendre ce que font les autres profils et à quel moment ils interviennent",
-      "•  Rejouer seul un cas pratique de bout en bout",
-      "•  Savoir demander de l'aide (catalogue GLPI « GREL / E-RECLAMATION »)"], bs=15)
-card(s, 6.85, 1.3, 6.0, 5.5, "Déroulé conseillé (≈ 3 h 30)",
-     ["•  Introduction et cycle de vie ......... 20 min",
-      "•  Module 1 — Espace assuré ................ 30 min",
-      "•  Module 2 — Agent accueil ................ 40 min",
-      "•  Module 3 — Pilote .............................. 50 min",
-      "•  Module 4 — Manager ......................... 30 min",
-      "•  Module 5 — Cas pratique et exercices 40 min",
-      "•  Assistance, questions-réponses ...... 20 min"], color=ORANGE, bs=15)
-notes(s, "Adapter la durée selon le public. Les modules 2, 3 et 4 peuvent être donnés séparément à chaque profil ; le module 1 et le cas pratique sont utiles à tous.")
+# ======================== 2. Sommaire
+counter["n"] += 1
+s = prs.slides.add_slide(LAY[1])
+mods = [("Introduction", ["0.1 L'application et ses acteurs", "0.2 Cycle de vie et connexion"]),
+        ("Espace assuré", ["1.1 Déclarer une réclamation", "1.2 Suivre son dossier"]),
+        ("Agent accueil et relations client", ["2.1 Saisir au guichet", "2.2 Qualifier les dossiers du portail"]),
+        ("Pilote", ["3.1 Prendre en charge, analyser", "3.2 Actions et soumission"]),
+        ("Manager de service / section", ["4.1 Examiner le dossier", "4.2 Clôturer ou retourner"]),
+        ("Cas pratique", ["5.1 Le dossier REC-2026-000010", "5.2 Exercices et assistance"])]
+for i, (h, subs) in enumerate(mods):
+    x = 0.72 + (i % 3) * 4.22; y = 1.55 + (i // 3) * 2.55
+    c = rect(s, x, y, 0.7, 0.7, ORANGE, shape=MSO_SHAPE.OVAL)
+    tf = c.text_frame; tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0; tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+    p = tf.paragraphs[0]; p.alignment = PP_ALIGN.CENTER; r = p.add_run(); r.text = str(i); r.font.size = Pt(20); r.font.bold = True; r.font.color.rgb = WHITE
+    text(s, x, y + 0.9, 3.7, 0.7, h, size=17, bold=True)
+    text(s, x, y + 1.55, 3.7, 0.8, [[(t, {"size": 12, "color": GRAY})] for t in subs])
+notes(s, "Présenter les six blocs. Fil rouge : un seul dossier, REC-2026-000010, suivi du début à la fin par tous les profils.")
 
-# 3. Programme (modules)
-s = base("Programme")
-mods = [("0", "Introduction", "Application, acteurs, statuts, connexion", BLUE),
-        ("1", "Espace assuré", "Déclarer et suivre une réclamation", GREEN),
-        ("2", "Agent accueil", "Saisir, qualifier les dossiers du portail", ORANGE),
-        ("3", "Pilote", "Prendre en charge, analyser, agir, soumettre", BLUE),
-        ("4", "Manager", "Examiner, clôturer ou retourner", GREEN),
-        ("5", "Cas pratique", "Le dossier REC-2026-000009 de bout en bout", ORANGE)]
-for i, (n, h, d, c) in enumerate(mods):
-    x = 0.45 + (i % 3) * 4.2; y = 1.4 + (i // 3) * 2.9
-    rect(s, x, y, 4.0, 2.6, WHITE, RGBColor(0xC8, 0xD0, 0xDC), MSO_SHAPE.ROUNDED_RECTANGLE).adjustments[0] = 0.06
-    rect(s, x, y, 4.0, 0.1, c)
-    text(s, x + 0.2, y + 0.25, 1.0, 1.1, n, size=54, bold=True, color=c)
-    text(s, x + 1.3, y + 0.35, 2.6, 0.7, h, size=22, bold=True, color=NAVY, anchor=MSO_ANCHOR.MIDDLE)
-    text(s, x + 0.2, y + 1.5, 3.6, 1.0, d, size=15, color=DARK)
-notes(s, "Présenter rapidement les six blocs. Insister sur le fil rouge : un seul dossier, REC-2026-000009, suivi du début à la fin par tous les profils.")
+# ======================== Introduction
+s = content("INTRODUCTION", "Objectifs de la formation", "Ce que vous saurez faire", "Durée conseillée : environ 3 h 30. Les modules 2, 3 et 4 peuvent être donnés séparément à chaque profil.")
+card(s, 0.5, 1.3, 6.0, 5.4, "À l'issue de la formation",
+     ["•  Expliquer le circuit d'une réclamation, de la déclaration à la clôture", "•  Accompagner un assuré sur le portail", "•  Réaliser les actions de votre profil",
+      "•  Comprendre le rôle des autres profils", "•  Rejouer seul un cas pratique complet", "•  Demander de l'aide via GLPI (GREL / E-RECLAMATION)"], bs=14)
+card(s, 6.85, 1.3, 6.0, 5.4, "Déroulé conseillé (≈ 3 h 30)",
+     ["•  Introduction et cycle de vie — 20 min", "•  Module 1 · Espace assuré — 30 min", "•  Module 2 · Agent accueil — 40 min", "•  Module 3 · Pilote — 50 min",
+      "•  Module 4 · Manager — 30 min", "•  Module 5 · Cas pratique et exercices — 40 min", "•  Assistance et questions — 20 min"], color=ORANGE, bs=14)
 
-# 4. L'application en bref
-s = base("e-Réclamations en bref", "INTRODUCTION")
-text(s, 0.45, 1.2, 12.4, 0.8, "Une plateforme web unique pour recevoir, traiter et suivre les réclamations des assurés, avec un portail public et un espace réservé au personnel CNPS.",
-     size=17, color=DARK)
-actors = [("Assuré", "Portail public, sans compte", "Déclare sa réclamation et suit son avancement avec un numéro de ticket (REC-AAAA-NNNNNN).", GREEN),
-          ("Agent accueil et relations client", "Espace agent", "Saisit les réclamations reçues au guichet et qualifie celles venues du portail (Agence Digitale).", ORANGE),
-          ("Pilote", "Espace agent", "Prend le dossier en charge, analyse la cause, enregistre les actions et soumet à validation.", BLUE),
-          ("Manager de service / section", "Espace agent", "Examine le traitement puis clôture le dossier ou le retourne au pilote.", NAVY)]
+s = content("INTRODUCTION", "e-Réclamations en bref", "Une plateforme, quatre acteurs",
+            "Les profils Superviseur, Coordonnateur et Administrateurs existent mais ne sont pas traités ici. Chaque réclamation reçoit un numéro de ticket unique.")
+text(s, 0.5, 1.2, 12.3, 0.8, "Une plateforme web pour recevoir, traiter et suivre les réclamations des assurés : un portail public et un espace réservé au personnel CNPS.", size=15, color=GRAY)
+actors = [("Assuré", "Portail public, sans compte", "Déclare sa réclamation et la suit avec un numéro de ticket (REC-AAAA-NNNNNN).", GREEN),
+          ("Agent accueil et relations client", "Espace agent", "Saisit les réclamations du guichet et qualifie celles du portail (Agence Digitale).", ORANGE),
+          ("Pilote", "Espace agent", "Prend en charge, analyse la cause, enregistre les actions et soumet à validation.", BLUE),
+          ("Manager de service / section", "Espace agent", "Examine le traitement puis clôture le dossier ou le retourne au pilote.", RGBColor(0x0F, 0x24, 0x4D))]
 for i, (h, sub, d, c) in enumerate(actors):
-    x = 0.45 + i * 3.15
-    rect(s, x, 2.3, 3.0, 4.4, WHITE, RGBColor(0xC8, 0xD0, 0xDC), MSO_SHAPE.ROUNDED_RECTANGLE).adjustments[0] = 0.05
-    rect(s, x, 2.3, 3.0, 0.12, c)
-    text(s, x + 0.12, 2.55, 2.76, 0.9, h, size=18, bold=True, color=c)
-    text(s, x + 0.12, 3.45, 2.76, 0.4, sub, size=12, bold=True, color=GRAY)
-    text(s, x + 0.12, 3.95, 2.76, 2.6, d, size=14)
-notes(s, "Les profils Superviseur, Coordonnateur et Administrateurs existent aussi mais ne sont pas traités dans ce support. "
-         "Rappeler que chaque réclamation reçoit un numéro de ticket unique, à communiquer à l'assuré.")
+    card(s, 0.5 + i * 3.12, 2.1, 2.95, 4.6, h, [[(sub, {"size": 11, "bold": True, "color": GRAY})], d], color=c, hs=16, bs=13)
 
-# 5. Cycle de vie
-s = base("Le cycle de vie d'une réclamation", "INTRODUCTION")
-steps = [("Nouveau", "Déclarée (portail) ou saisie (guichet)", "Assuré / Agent", ORANGE),
-         ("En cours", "Prise en charge par un pilote", "Pilote", BLUE),
-         ("À clôturer", "Soumise à validation", "Pilote → Manager", RGBColor(0x7C, 0x3A, 0xED)),
-         ("Résolu", "Clôturée, réponse disponible", "Manager", GREEN)]
+s = content("INTRODUCTION", "Le cycle de vie d'une réclamation", "De la déclaration à la clôture",
+            "Faire verbaliser : qui déclenche chaque changement de statut ? Côté assuré le statut est simplifié en 4 étapes.")
+steps = [("Nouveau", "Déclarée (portail) ou saisie (guichet)", "Assuré / Agent", ORANGE), ("En cours", "Prise en charge par un pilote", "Pilote", BLUE),
+         ("À clôturer", "Soumise à validation", "Pilote → Manager", RGBColor(0x7C, 0x3A, 0xED)), ("Résolu", "Clôturée, réponse disponible", "Manager", GREEN)]
 for i, (h, d, who, c) in enumerate(steps):
-    x = 0.45 + i * 3.15
-    ch = rect(s, x, 1.5, 3.1, 1.2, c, shape=MSO_SHAPE.CHEVRON if i else MSO_SHAPE.PENTAGON)
-    text(s, x + 0.45, 1.5, 2.3, 1.2, h, size=22, bold=True, color=WHITE, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
-    text(s, x + 0.1, 2.85, 2.9, 0.9, d, size=14, align=PP_ALIGN.CENTER)
-    text(s, x + 0.1, 3.75, 2.9, 0.4, who, size=13, bold=True, color=c, align=PP_ALIGN.CENTER)
-card(s, 0.45, 4.4, 6.1, 2.4, "Et aussi…",
-     ["•  « Retourner » : le manager renvoie le dossier au pilote (retour à « En cours »)",
-      "•  « Escalader » : le pilote transmet un dossier relevant d'une autre structure",
-      "•  Dossier « Non qualifié » : venu du portail, à qualifier avant traitement"], bs=13, color=ORANGE)
-card(s, 6.85, 4.4, 6.0, 2.4, "Les délais (SLA)",
-     ["•  Chaque sous-motif a un délai de traitement (échéance affichée sur le dossier)",
-      "•  Au-delà de l'échéance : le dossier passe « Hors délai » (corbeille dédiée)",
-      "•  La cloche et les compteurs du bandeau signalent les urgences"], bs=13, color=RED)
-notes(s, "Faire verbaliser le cycle : qui déclenche chaque changement de statut ? "
-         "Le statut côté assuré est simplifié en 4 étapes (Réception, Traitement, Clôture, Terminée).")
+    x = 0.5 + i * 3.12
+    rect(s, x, 1.5, 3.05, 1.1, c, shape=MSO_SHAPE.CHEVRON if i else MSO_SHAPE.PENTAGON)
+    text(s, x + 0.45, 1.5, 2.2, 1.1, h, size=20, bold=True, color=WHITE, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
+    text(s, x + 0.1, 2.75, 2.85, 0.8, d, size=13, align=PP_ALIGN.CENTER)
+    text(s, x + 0.1, 3.5, 2.85, 0.4, who, size=12, bold=True, color=c, align=PP_ALIGN.CENTER)
+card(s, 0.5, 4.2, 6.0, 2.5, "Et aussi…", ["•  « Retourner » : le manager renvoie le dossier au pilote (retour « En cours »)", "•  « Escalader » : le pilote transmet à une autre structure",
+                                          "•  « Non qualifié » : dossier du portail à qualifier avant traitement"], bs=12, color=ORANGE)
+card(s, 6.85, 4.2, 6.0, 2.5, "Les délais (SLA)", ["•  Chaque sous-motif a un délai de traitement (échéance affichée)", "•  Au-delà : « Hors délai » (corbeille dédiée)", "•  Les compteurs du bandeau signalent les urgences"], bs=12, color=RED)
 
-# 6. Connexion
-shot_slide("Se connecter à l'espace agent", "INTRODUCTION", "login",
-           [("Page d'accueil → Espace agent", "Depuis le portail public, bouton « Espace agent CNPS »."),
-            ("Identifiant", "Matricule ou adresse e-mail professionnelle."),
-            ("Mot de passe", "Saisi masqué ; l'œil permet de le vérifier."),
-            ("Se connecter", "Vous arrivez sur votre tableau de bord.")],
-           marks=[(2, 255, 400), (3, 255, 485), (4, 255, 600)], tip="Un identifiant = une personne. Ne partagez jamais votre mot de passe.",
-           note="Montrer l'accès depuis le portail public (bouton en haut à droite) puis la page de connexion. Les comptes de test utilisent le mot de passe communiqué par le formateur ; il doit être changé en production.")
+shot("INTRODUCTION", "Se connecter à l'espace agent", "Page de connexion", "login",
+     [("Matricule ou e-mail", "Votre matricule ou adresse e-mail professionnelle."), ("Mot de passe", "Saisi masqué ; l'œil permet de le vérifier."),
+      ("Se connecter", "Vous arrivez sur votre tableau de bord.")],
+     marks=[(30, 298, 368, 328), (30, 365, 368, 400), (30, 452, 368, 484)],
+     tip="Un identifiant = une personne. Ne partagez jamais votre mot de passe.",
+     note="L'accès se fait depuis le portail public (bouton « Espace agent CNPS ») ou directement par /login. Changer le mot de passe dès la première connexion.")
 
-# 7. Profil / mot de passe
-shot_slide("Mon profil et changement de mot de passe", "INTRODUCTION", "common_profil",
-           [("Administration & Profil", "Menu de gauche, pour tous les profils."),
-            ("Mon profil", "Votre matricule, votre e-mail et votre agence d'affectation."),
-            ("Mot de passe", "Ancien mot de passe, nouveau (6 caractères minimum), confirmation.")],
-           marks=[(1, 130, 267), (2, 440, 560), (3, 880, 480)],
-           tip="Changez votre mot de passe dès la première connexion.",
-           note="Les champs de mot de passe sont masqués. Rappeler qu'après modification il faut se reconnecter.")
+# ======================== Module 1
+section("1", "Espace assuré", "Déclarer une réclamation et suivre son avancement", "Le portail est ouvert à tout assuré, sans compte. L'agent d'accueil peut aussi accompagner l'assuré.")
 
-# ===== MODULE 1 =====
-divider("1", "Espace assuré", "Déclarer une réclamation et suivre son avancement", "MODULE 1  ·  PORTAIL PUBLIC — SANS COMPTE",
-        "Le portail est ouvert à tout assuré, sans création de compte. L'agent d'accueil peut aussi accompagner l'assuré sur place ou au téléphone.")
+shot("MODULE 1 · ASSURÉ", "Le portail assuré", "Deux actions principales", "assure_01_accueil",
+     [("Déposer une réclamation", "Formulaire en 2 étapes ; un numéro de suivi est remis."), ("Suivre une réclamation", "Saisir le numéro REC-AAAA-NNNNNN."), ("Espace agent CNPS", "Réservé au personnel (connexion).")],
+     marks=[(125, 305, 490, 535), (510, 305, 875, 535), (788, 10, 925, 42)], tip="Le numéro de ticket est la clé du suivi : il doit être conservé.",
+     note="Page d'accueil publique : deux actions pour l'assuré.")
 
-shot_slide("Le portail assuré", "MODULE 1 · ASSURÉ", "assure_01_accueil",
-           [("Déposer une réclamation", "Ouvre le formulaire en 2 étapes. Un numéro de suivi est remis à la fin."),
-            ("Suivre une réclamation", "Saisir le numéro (REC-AAAA-NNNNNN) pour voir l'avancement."),
-            ("Espace agent CNPS", "Réservé au personnel (connexion).")],
-           marks=[(1, 392, 634), (2, 829, 634), (3, 1098, 32)],
-           tip="Le numéro de ticket est la clé du suivi : il doit être conservé.",
-           note="Page d'accueil publique : deux actions principales pour l'assuré. Le lien « Espace agent CNPS » mène à la connexion du personnel.")
+shot("MODULE 1 · ASSURÉ", "Déclarer — étape 1 : identification", "Vos informations (1/2)", "assure_02_etape1_haut",
+     [("Régime", "RGTS, RSTI ou RCTI."), ("Vous êtes…", "Travailleur, retraité, employeur, ayant droit…"), ("Immatriculé à la CNPS ?", "Oui : un numéro d'immatriculation est demandé.")],
+     marks=[(188, 448, 488, 492), (512, 405, 812, 448), (194, 538, 805, 585)],
+     tip="Le numéro CNPS est contrôlé automatiquement (12 chiffres au Régime Général).",
+     note="Le contrôle du numéro évite une saisie incomplète. Si l'assuré n'est pas immatriculé, répondre « Non ».")
 
-shot_slide("Déclarer — étape 1 : vos informations (1/2)", "MODULE 1 · ASSURÉ", "assure_02_etape1_haut",
-           [("Régime et type d'assuré", "Régime (RGTS, RSTI, RCTI) puis « Vous êtes… » (travailleur, retraité, employeur…)."),
-            ("Immatriculé à la CNPS ?", "Oui : le numéro d'immatriculation est demandé. Non : aucun numéro requis."),
-            ("Numéro d'immatriculation", "Contrôlé automatiquement : 12 chiffres (Régime Général), 14 (RSTI), 1 à 6 (employeur).")],
-           tip="Un numéro mal saisi est refusé avec un message clair : vérifier avec la carte CNPS.",
-           numbered=False,
-           note="Insister sur le contrôle du numéro CNPS : il empêche la saisie d'un numéro incomplet. Si l'assuré n'est pas immatriculé, répondre « Non ». Les règles de format sont celles appliquées par l'application.")
+shot("MODULE 1 · ASSURÉ", "Déclarer — étape 1 : coordonnées", "Vos informations (2/2)", "assure_03_etape1_bas",
+     [("Nom de l'employeur", "Facultatif, utile pour retrouver le dossier."), ("Téléphone", "Obligatoire : contact et communication du numéro de suivi."),
+      ("E-mail", "Recommandé pour recevoir le suivi."), ("Continuer", "Passe à l'étape 2.")],
+     marks=[(188, 111, 812, 156), (188, 291, 488, 337), (512, 291, 812, 337), (677, 380, 812, 424)],
+     tip="Demander à l'assuré un numéro de téléphone joignable.", note="Téléphone obligatoire, e-mail recommandé.")
 
-shot_slide("Déclarer — étape 1 : coordonnées (2/2)", "MODULE 1 · ASSURÉ", "assure_03_etape1_bas",
-           [("Nom et prénoms, civilité", "Tels qu'ils figurent sur les documents CNPS."),
-            ("Nom de l'employeur", "Facultatif mais utile pour retrouver le dossier."),
-            ("Téléphone (obligatoire)", "Sert au contact et à la communication du numéro de suivi par SMS."),
-            ("E-mail (recommandé)", "Permet de recevoir le suivi.")],
-           numbered=False, tip="Téléphone obligatoire : demander à l'assuré un numéro joignable.",
-           note="Le bouton « Continuer » passe à l'étape 2. Le téléphone est obligatoire ; l'e-mail est recommandé.")
+shot("MODULE 1 · ASSURÉ", "Déclarer — étape 2 : votre réclamation", "Motif et description", "assure_04_etape2",
+     [("Sujet", "Objet de la réclamation (ex. Non réception d'un paiement)."), ("Précision", "Affine le sujet ; détermine le délai de traitement."),
+      ("Description", "Dates, montants et références du dossier.")],
+     marks=[(188, 403, 488, 447), (512, 403, 812, 447), (188, 515, 812, 620)],
+     tip="Pièces jointes facultatives : PDF, Word, Excel, JPG, PNG, TXT — 5 Mo maximum.",
+     note="Insister sur la qualité de la description : elle permet à l'agent de qualifier correctement. Assuré fictif : KOUASSI DEMO FORMATION.")
 
-shot_slide("Déclarer — étape 2 : votre réclamation", "MODULE 1 · ASSURÉ", "assure_04_etape2",
-           [("Sujet de la réclamation", "Liste des objets disponibles pour le régime et le type choisis (ex. Non réception d'un paiement)."),
-            ("Précision (sous-motif)", "Affine le sujet ; il détermine le délai de traitement."),
-            ("Description", "Dates, montants et références (n° de dossier, de courrier) pour un traitement plus rapide.")],
-           marks=[(1, 432, 544), (2, 845, 544), (3, 635, 688)],
-           tip="Pièces jointes facultatives : PDF, Word, Excel, JPG, PNG, TXT — 5 Mo maximum par fichier.",
-           note="Présenter les trois champs obligatoires. Insister sur la qualité de la description : c'est ce qui permet à l'agent de qualifier correctement. "
-                "Pour la démonstration, un assuré fictif (KOUASSI DEMO FORMATION) a été utilisé.")
+shot("MODULE 1 · ASSURÉ", "Déclaration envoyée", "Le numéro de ticket", "assure_05_confirmation",
+     [("Numéro de suivi", "REC-2026-000010 : à conserver et à communiquer à l'assuré.")],
+     marks=[(388, 312, 612, 348)], tip="Ce numéro permet de suivre le dossier sans se déplacer.",
+     note="Ce numéro est celui suivi pendant tout le cas pratique : REC-2026-000010.")
 
-shot_slide("Déclaration envoyée : le numéro de ticket", "MODULE 1 · ASSURÉ", "assure_05_confirmation",
-           [("Numéro de suivi", "REC-2026-000009 : à noter précieusement et à communiquer à l'assuré.")],
-           marks=[(1, 637, 427)], tip="Le dossier est transmis aux services compétents ; l'assuré reçoit son numéro par SMS.",
-           note="Ce numéro est celui que nous suivrons pendant tout le cas pratique : REC-2026-000009.")
+shot("MODULE 1 · ASSURÉ", "Suivre sa réclamation", "État juste après la dépôt", "assure_06b_suivi_carte",
+     [("Statut actuel", "« Réceptionnée » juste après la déclaration."), ("Les 4 étapes", "Réception → Traitement → Clôture → Terminée."),
+      ("Informations du dossier", "Objet, agence de traitement, dates."), ("Accusé / Partager", "Accusé de réception et partage du suivi.")],
+     marks=[(615, 49, 775, 106), (238, 165, 762, 265), (238, 333, 762, 508), (238, 559, 459, 592)],
+     tip="Tant que le dossier n'est pas qualifié, il est rattaché à l'Agence Digitale.",
+     note="Page /suivi avec le numéro saisi. L'agence affichée est l'Agence Digitale, qui qualifie les dossiers du portail.")
 
-shot_slide("Suivre sa réclamation (état initial)", "MODULE 1 · ASSURÉ", "assure_06_suivi",
-           [("Statut actuel", "« Réceptionnée » juste après la déclaration."),
-            ("Les 4 étapes", "Réception → Traitement → Clôture → Terminée."),
-            ("Informations du dossier", "Objet, agence de traitement, date de dépôt, dernière mise à jour."),
-            ("Accusé / Partager", "Télécharger l'accusé de réception ou partager le suivi.")],
-           marks=[(1, 890, 700), (2, 640, 830), (3, 460, 1065), (4, 366, 1323)], crop=(230, 600, 1050, 1410),
-           tip="Le dossier est rattaché à l'Agence Digitale tant qu'il n'a pas été qualifié.",
-           note="Montrer la page /suivi avec le numéro saisi. L'agence de traitement affichée est l'Agence Digitale : c'est elle qui qualifie les dossiers du portail.")
+# ======================== Module 2
+section("2", "Agent accueil et relations client", "Saisir les réclamations et qualifier celles du portail",
+        "Deux missions : saisir les réclamations reçues au guichet ou par téléphone, et qualifier les réclamations du portail public.")
 
-# ===== MODULE 2 : AGENT =====
-divider("2", "Agent accueil et relations client", "Saisir les réclamations et qualifier celles du portail", "MODULE 2  ·  PROFIL AGENT  (compte de test : BEDEL ZAKRO — Agence Digitale)",
-        "Deux missions : saisir les réclamations reçues au guichet ou par téléphone, et qualifier les réclamations arrivées du portail public.")
+shot("MODULE 2 · AGENT", "Le tableau de bord de l'agent", "Votre point de départ", "agent_01_dashboard",
+     [("Bandeau d'accueil", "Résumé de vos réclamations à traiter."), ("Compteurs", "À traiter, échéance du jour, en retard."),
+      ("Nouvelle réclamation", "Saisie d'une réclamation du guichet."), ("Corbeilles", "Non affectées, En cours, Hors délai, Non qualifiées…"), ("Liste des dossiers", "Bouton « Traiter » pour ouvrir un dossier.")],
+     marks=[(218, 62, 977, 160), (730, 95, 950, 140), (833, 175, 977, 203), (10, 238, 192, 430), (218, 375, 977, 600)],
+     tip="La cloche en haut à droite signale les nouveaux événements.", note="Parcourir le tableau de bord de haut en bas.")
 
-shot_slide("Le tableau de bord de l'agent", "MODULE 2 · AGENT", "agent_01_dashboard",
-           [("Bandeau d'accueil", "Résumé de vos réclamations à traiter."),
-            ("Compteurs", "À traiter, échéance du jour, en retard."),
-            ("Nouvelle réclamation", "Saisie d'une réclamation reçue au guichet."),
-            ("Corbeilles de traitement", "Vues par statut : Non affectées, En cours, Hors délai, Non qualifiées…"),
-            ("Liste des dossiers", "Bouton « Traiter » pour ouvrir un dossier.")],
-           marks=[(1, 480, 144), (2, 960, 136), (3, 1160, 242), (4, 110, 380), (5, 1203, 547)],
-           tip="La cloche en haut à droite signale les nouveaux événements.",
-           note="Parcourir le tableau de bord de haut en bas. Les chiffres du bandeau supérieur (nouveau, en cours, à clôturer, hors délai) sont visibles depuis toutes les pages.")
+shot("MODULE 2 · AGENT", "Saisir une réclamation au guichet", "Menu « Nouvelle réclamation »", "agent_09_nouvelle_reclamation",
+     [("Références du client", "Régime, type, numéro d'immatriculation, nom, téléphone."), ("Motif et description", "Choisir le motif et le sous-motif, puis décrire."),
+      ("Enregistrement", "Un numéro de ticket est généré : à communiquer à l'assuré.")],
+     tip="Vérifier l'identité et le numéro CNPS avec l'assuré avant d'enregistrer.",
+     note="Même logique que le portail, avec en plus le mode de saisine. Cet écran n'a pas été soumis dans le cas fil rouge (le dossier vient du portail).")
 
-shot_slide("Saisir une réclamation reçue au guichet", "MODULE 2 · AGENT", "agent_09_nouvelle_reclamation",
-           [("Menu « Nouvelle réclamation »", "Formulaire complet pour un assuré qui se présente ou appelle."),
-            ("Références du client", "Régime, type, numéro d'immatriculation, nom, téléphone."),
-            ("Motif et description", "Choisir le motif et le sous-motif, puis décrire la demande."),
-            ("Enregistrement", "Un numéro de ticket est généré : à communiquer à l'assuré.")],
-           numbered=False, tip="Vérifier l'identité et le numéro CNPS avec l'assuré avant d'enregistrer.",
-           note="La saisie au guichet suit la même logique que le portail, avec en plus le choix du mode de saisine. "
-                "Cette étape n'a pas été validée dans le cas fil rouge (le dossier REC-2026-000009 vient du portail).")
+shot("MODULE 2 · AGENT", "Les réclamations non qualifiées", "Corbeille « Non qualifiées »", "agent_02_non_qualifiees",
+     [("Titre de la corbeille", "Dossiers du portail en attente de qualification."), ("Corbeille active", "Menu de gauche : « Non qualifiées »."),
+      ("Dossier REC-2026-000010", "Statut « Nouveau », processus NQ."), ("Traiter", "Ouvre la fiche du dossier.")],
+     marks=[(225, 238, 520, 270), (10, 400, 190, 432), (225, 425, 977, 490), (918, 430, 970, 455)],
+     tip="Tant que le processus est « NQ », le dossier ne peut pas être pris en charge.",
+     note="Cœur du rôle de l'agent d'Agence Digitale : transformer un dossier brut du portail en dossier exploitable.")
 
-shot_slide("Les réclamations non qualifiées", "MODULE 2 · AGENT", "agent_02_non_qualifiees",
-           [("Corbeille « Non qualifiées »", "Dossiers venus du portail en attente de qualification par l'Agence Digitale."),
-            ("Description de la corbeille", "Rappelle la règle : qualification par l'Agence Digitale."),
-            ("Dossier REC-2026-000009", "Statut « Nouveau », processus NQ (non qualifié)."),
-            ("Traiter", "Ouvre la fiche du dossier.")],
-           marks=[(1, 88, 531), (2, 432, 320), (3, 360, 565), (4, 1211, 565)],
-           tip="Tant que le processus est « NQ », le dossier ne peut pas être pris en charge par un pilote.",
-           note="C'est le cœur du rôle de l'agent d'Agence Digitale : transformer un dossier brut du portail en dossier exploitable.")
+shot("MODULE 2 · AGENT", "La fiche du dossier", "Quatre onglets", "agent_04_fiche_vue",
+     [("Statut", "« Nouveau » : personne n'a encore agi."), ("Onglets", "Vue d'ensemble, Traitement, Documents, Historique."),
+      ("Client", "Identité, n° CNPS, régime, coordonnées."), ("Dossier et délais", "Agence, processus, motif, sous-motif, échéance.")],
+     marks=[(925, 65, 978, 84), (222, 167, 668, 200), (218, 222, 470, 610), (487, 222, 735, 610)],
+     tip="Toute modification est horodatée et attribuée dans l'historique.", note="Faire repérer les quatre onglets.")
 
-shot_slide("La fiche du dossier", "MODULE 2 · AGENT", "agent_04_fiche_vue",
-           [("Statut", "« Nouveau » : personne n'a encore agi."),
-            ("4 onglets", "Vue d'ensemble, Traitement, Documents, Historique."),
-            ("Client", "Identité, n° CNPS, régime, coordonnées. « Corriger » permet de rectifier (modification tracée)."),
-            ("Dossier et délais", "Agence, processus (NQ), motif, sous-motif, échéance."),
-            ("Contexte", "Réclamant, échéance, pièces jointes, dernières actions.")],
-           marks=[(1, 1218, 94), (2, 568, 232), (3, 384, 304), (4, 704, 304), (5, 1040, 240)],
-           tip="Toute modification d'une information est horodatée et attribuée dans l'historique.",
-           note="Faire repérer les quatre onglets. Le panneau « Contexte » à droite reste visible pendant tout le traitement.")
+shot("MODULE 2 · AGENT", "Qualifier : le formulaire", "Onglet Traitement", "agent_05_qualif_vide",
+     [("Bloc de qualification", "« Réservé aux agents de l'Agence Digitale » — action requise."), ("Processus, objet, précision", "Le processus détermine le service qui traitera."),
+      ("Commentaire interne", "Consignes pour le pilote ; non visible de l'assuré."), ("Valider la qualification", "Enregistre et oriente le dossier.")],
+     marks=[(220, 216, 740, 276), (240, 303, 722, 347), (240, 382, 722, 460), (545, 490, 722, 525)],
+     tip="Choisir le processus d'après le sujet réel de la demande.", note="Le commentaire interne est destiné au pilote.")
 
-shot_slide("Qualifier : le formulaire", "MODULE 2 · AGENT", "agent_05_qualif_vide",
-           [("Bloc de qualification", "« Réservé aux agents de l'Agence Digitale » — action requise."),
-            ("Processus concerné", "À choisir : détermine le service qui traitera (ex. GDPF, GDAV, GREC…)."),
-            ("Objet principal", "Pré-rempli avec le choix de l'assuré, modifiable."),
-            ("Précision (sous-motif)", "Détermine le délai de traitement."),
-            ("Commentaire interne", "Consignes pour le pilote ; n'est pas visible de l'assuré."),
-            ("Valider la qualification", "Enregistre et oriente le dossier.")],
-           marks=[(1, 467, 307), (2, 400, 418), (3, 616, 418), (4, 827, 418), (5, 616, 528), (6, 810, 648)],
-           tip="Choisir le processus d'après le sujet réel de la demande, pas seulement d'après le titre.",
-           note="Onglet Traitement du dossier non qualifié. Expliquer que le commentaire interne est destiné au pilote.")
+shot("MODULE 2 · AGENT", "Qualifier : le dossier REC-2026-000010", "Formulaire complété", "agent_06_qualif_remplie",
+     [("Processus", "GPRES/GDPF : le sujet porte sur des allocations familiales."), ("Commentaire interne", "Consignes pour le pilote."),
+      ("Valider la qualification", "Le dossier quitte la corbeille « Non qualifiées ».")],
+     marks=[(240, 303, 722, 347), (240, 382, 722, 460), (545, 490, 722, 525)],
+     tip="Après validation, le dossier est affecté au processus choisi.", note="Sujet : allocations familiales non perçues → processus GDPF.")
 
-shot_slide("Qualifier : le dossier REC-2026-000009", "MODULE 2 · AGENT", "agent_06_qualif_remplie",
-           [("Processus", "Gérer les Dossiers de Prestations Familiales (GDPF) : le sujet porte sur des allocations familiales."),
-            ("Commentaire interne", "Consignes pour le pilote : vérifier la liquidation, contacter l'assuré si pièce manquante."),
-            ("Valider la qualification", "Message « La réclamation a été qualifiée avec succès ».")],
-           marks=[(1, 400, 428), (2, 616, 528), (3, 810, 648)],
-           tip="Après validation, le dossier quitte la corbeille « Non qualifiées ».",
-           note="Dans notre cas : sujet = non réception d'allocations familiales, donc processus GDPF.")
+shot("MODULE 2 · AGENT", "Après la qualification : historique", "Traçabilité", "agent_08_historique",
+     [("Journal du dossier", "La qualification est tracée : qui, quand, quel processus."), ("Statut du dossier", "Toujours « Nouveau » : un pilote doit maintenant prendre en charge.")],
+     tip="Fin du rôle de l'agent pour ce dossier : le pilote prend le relais.", note="Montrer l'onglet Historique.")
 
-shot_slide("Après la qualification : historique", "MODULE 2 · AGENT", "agent_08_historique",
-           [("Historique", "La qualification est tracée : qui, quand, quel processus, motif et précision."),
-            ("Statut du dossier", "Toujours « Nouveau » : un pilote doit maintenant le prendre en charge.")],
-           numbered=False, tip="Fin du rôle de l'agent pour ce dossier : le pilote prend le relais.",
-           note="Montrer l'onglet Historique : première ligne du journal du dossier.")
+# ======================== Module 3
+section("3", "Pilote", "Prendre en charge, analyser, agir, soumettre", "Quatre gestes : prendre en charge, analyser, enregistrer des actions, soumettre.")
 
-# ===== MODULE 3 : PILOTE =====
-divider("3", "Pilote", "Prendre en charge, analyser, agir et soumettre à validation", "MODULE 3  ·  PROFIL PILOTE  (compte de test : HERMANN BANZERE — Agence Digitale)",
-        "Le pilote est responsable du traitement. Quatre gestes : prendre en charge, analyser, enregistrer des actions, soumettre.")
+shot("MODULE 3 · PILOTE", "Le tableau de bord du pilote", "Vos dossiers à traiter", "pilote_01_dashboard",
+     [("Bandeau", "Vos réclamations à traiter, échéances, retards."), ("Filtres rapides", "Non qualifiées, Non affectées, À corriger, Clôturées, Suivi escalades."),
+      ("Actions rapides", "« Traiter » ouvre le dossier ; « Assigner » depuis la liste."), ("Corbeilles", "Menu de gauche, dont « Escaladées ».")],
+     marks=[(218, 62, 977, 160), (230, 335, 830, 362), (908, 415, 970, 468), (10, 240, 192, 450)],
+     tip="« À corriger » rassemble les dossiers retournés par le manager.", note="Mêmes corbeilles que l'agent, plus « À corriger » et « Escaladées ».")
 
-shot_slide("Le tableau de bord du pilote", "MODULE 3 · PILOTE", "pilote_01_dashboard",
-           [("Bandeau", "Vos réclamations à traiter, échéances du jour, retards."),
-            ("Filtres rapides", "Toutes agences, Non qualifiées, Non affectées, À corriger, Résolus, Suivi escalades."),
-            ("Actions rapides", "« Traiter » ouvre le dossier ; « Assigner » depuis la liste."),
-            ("Escaladées", "Corbeille propre aux profils non-agent.")],
-           marks=[(1, 480, 144), (2, 432, 438), (3, 1195, 566), (4, 72, 531)],
-           tip="« À corriger » rassemble les dossiers que le manager vous a retournés.",
-           note="Comparer avec le tableau de bord de l'agent : mêmes corbeilles, mais le pilote voit en plus « Escaladées » et « À corriger ».")
+shot("MODULE 3 · PILOTE", "Ouvrir un dossier à traiter", "Avant la prise en charge", "pilote_02_fiche_avant",
+     [("Messages de contrôle", "Analyse complétée et au moins une action réalisée avant soumission."), ("Prendre en charge", "Vous devenez responsable du dossier."),
+      ("Escalader le dossier", "Si la demande relève d'une autre structure."), ("Statut « Nouveau »", "Aucun pilote n'est assigné."), ("Pilote assigné", "Vide tant que le dossier n'est pas pris en charge.")],
+     marks=[(235, 118, 960, 195), (235, 203, 368, 232), (372, 203, 508, 232), (925, 66, 978, 86), (600, 562, 930, 605)],
+     tip="Le processus est GPRES/GDPF : le dossier a bien été qualifié.", note="Les deux bandeaux rappellent ce qui sera exigé avant de soumettre.")
 
-shot_slide("Ouvrir un dossier à traiter", "MODULE 3 · PILOTE", "pilote_02_fiche_avant",
-           [("Messages de contrôle", "Deux conditions avant soumission : analyse complétée et au moins une action réalisée."),
-            ("Prendre en charge", "Vous devenez le responsable du dossier."),
-            ("Escalader le dossier", "Si la demande relève d'une autre structure."),
-            ("Statut « Nouveau »", "Aucun pilote n'est encore assigné."),
-            ("Pilote assigné", "Vide tant que le dossier n'est pas pris en charge.")],
-           marks=[(1, 768, 170), (2, 384, 275), (3, 552, 275), (4, 1216, 94), (5, 680, 584)],
-           tip="Le processus est maintenant GDPF : le dossier a bien été qualifié par l'agent.",
-           note="Le dossier est désormais en processus GPRES/GDPF. Les deux bandeaux d'avertissement rappellent ce qui sera exigé avant de soumettre.")
+shot("MODULE 3 · PILOTE", "Prendre en charge", "Un seul clic", "pilote_03_prise_en_charge",
+     [("Statut « En cours »", "Dès la prise en charge."), ("Avertissements", "Le traitement reste à faire."),
+      ("Escalader", "Toujours possible."), ("Pilote assigné", "Votre nom apparaît.")],
+     marks=[(925, 66, 978, 84), (235, 118, 960, 195), (235, 203, 373, 232), (600, 562, 930, 600)],
+     tip="Le bouton « Prendre en charge » disparaît.", note="Le dossier passe de « Nouveau » à « En cours » et l'événement est tracé.")
 
-shot_slide("Prendre en charge", "MODULE 3 · PILOTE", "pilote_03_prise_en_charge",
-           [("Statut « En cours »", "Dès la prise en charge."),
-            ("Avertissements", "Toujours présents : le traitement reste à faire."),
-            ("Dernières actions", "« Prise en charge du dossier » est enregistrée."),
-            ("Pilote assigné", "Votre nom apparaît.")],
-           marks=[(1, 1216, 94), (2, 768, 170), (3, 1104, 656), (4, 704, 765)],
-           tip="Le bouton « Prendre en charge » disparaît : vous êtes désormais responsable du dossier.",
-           note="Un seul clic ; le dossier passe de « Nouveau » à « En cours » et l'événement est tracé.")
+shot("MODULE 3 · PILOTE", "Traitement : analyse et actions", "Onglet Traitement", "pilote_04_traitement_vide",
+     [("Avertissements", "Deux conditions avant la soumission."), ("Analyse", "Catégorie de cause, cause, commentaire."),
+      ("Liste des corrections", "Actions à mener ; vide au départ."), ("Ajouter une action", "Enregistre une action de traitement.")],
+     marks=[(235, 118, 965, 192), (219, 320, 570, 605), (586, 320, 937, 420), (805, 332, 921, 354)],
+     tip="Soumission impossible sans analyse enregistrée et action réalisée.", note="Comprendre la cause (analyse) puis agir (actions).")
 
-shot_slide("Traitement : analyse et actions", "MODULE 3 · PILOTE", "pilote_04_traitement_vide",
-           [("Onglet Traitement", "Deux zones : l'analyse du problème et la liste des corrections."),
-            ("Analyse", "Catégorie de cause, cause, commentaire. « Suggestions » propose des pistes."),
-            ("Liste des corrections", "Actions à mener ; vide au départ."),
-            ("Ajouter une action", "Enregistre une action de traitement.")],
-           marks=[(1, 515, 362), (2, 416, 443), (3, 800, 435), (4, 864, 448)],
-           tip="Soumission impossible tant que l'analyse n'est pas enregistrée et qu'aucune action n'est réalisée.",
-           note="Expliquer la logique : comprendre la cause (analyse) puis agir (actions).")
+shot("MODULE 3 · PILOTE", "Renseigner l'analyse", "Catégorie, cause, commentaire", "pilote_05_analyse_remplie",
+     [("Catégorie", "Cause CNPS ou Cause client."), ("Cause", "La liste dépend de la catégorie (ex. « Emission non payée »)."),
+      ("Commentaire", "Décrire précisément la cause constatée."), ("Enregistrer", "Message « L'analyse a été mise à jour ».")],
+     tip="Une bonne analyse facilite la validation par le manager.", note="La liste des causes se charge après le choix de la catégorie.")
 
-shot_slide("Renseigner l'analyse", "MODULE 3 · PILOTE", "pilote_05_analyse_remplie",
-           [("Catégorie", "Cause CNPS ou Cause client."),
-            ("Cause", "La liste dépend de la catégorie et du processus (ex. « Emission non payée »)."),
-            ("Commentaire", "Décrire précisément la cause constatée."),
-            ("Enregistrer", "Message « L'analyse a été mise à jour ».")],
-           marks=[(1, 442, 530), (2, 442, 598), (3, 442, 675), (4, 541, 443)],
-           tip="Une bonne analyse facilite la validation par le manager.",
-           note="La liste des causes se charge après le choix de la catégorie : patienter une seconde.")
+shot("MODULE 3 · PILOTE", "Ajouter une action de traitement", "Fenêtre d'ajout", "pilote_06_action_modal",
+     [("Libellé de l'action", "Obligatoire. Ex. : « Demande de paiement… »."), ("Structure sollicitée", "Service à qui l'action est demandée (facultatif)."),
+      ("Observations", "Notes complémentaires."), ("Ajouter l'action", "Créée au statut « en attente ».")],
+     marks=[(315, 229, 684, 258), (315, 287, 684, 316), (315, 344, 684, 406), (569, 430, 684, 458)],
+     tip="Une action = une chose précise et vérifiable.", note="Détailler un exemple d'action pour le cas fil rouge.")
 
-_n6,_a,_b=mock_modal("pilote_06_action_modal","Ajouter une action",[("LIBELLÉ DE L'ACTION *","Demande de paiement de l'émission…",0),("STRUCTURE SOLLICITÉE","Prestations familiales",0),("OBSERVATIONS","Notes complémentaires",0)],"Ajouter l'action")
-shot_slide("Ajouter une action de traitement", "MODULE 3 · PILOTE", _n6,
-           [("Libellé de l'action", "Obligatoire. Ex. : « Demande de paiement de l'émission… »."),
-            ("Structure sollicitée", "Service à qui l'action est demandée (facultatif)."),
-            ("Observations", "Notes complémentaires."),
-            ("Ajouter l'action", "L'action est créée au statut « en attente ».")],
-           marks=[(1, 440, 241), (2, 440, 336), (3, 440, 431), (4, 650, 520)],
-           tip="Une action = une chose précise à faire, vérifiable.",
-           note="Détailler un exemple d'action pour le cas fil rouge.")
+shot("MODULE 3 · PILOTE", "L'action est enregistrée", "Statut « en attente »", "pilote_07_action_ajoutee",
+     [("Liste des corrections", "1 action enregistrée."), ("Statut de l'action", "« en_attente » tant qu'elle n'est pas réalisée."),
+      ("Icônes d'action", "Modifier, supprimer, marquer comme réalisé (coche verte).")],
+     tip="Si le tableau semble tronqué, repliez le panneau « Contexte » (icône à droite des onglets).",
+     note="Les icônes sont à droite du tableau ; replier le panneau Contexte libère de la place.")
 
-shot_slide("L'action est enregistrée", "MODULE 3 · PILOTE", "pilote_07_action_ajoutee",
-           [("Liste des corrections", "1 action, statut « en attente »."),
-            ("Statut de l'action", "« en_attente » tant qu'elle n'est pas réalisée."),
-            ("Avertissement", "« Au moins une action doit être enregistrée et réalisée » : il reste à la marquer réalisée.")],
-           marks=[(1, 704, 384), (2, 877, 602), (3, 768, 170)],
-           tip="Si le tableau semble tronqué, repliez le panneau « Contexte » (icône à droite des onglets).",
-           note="Astuce d'usage vue pendant la préparation : les icônes d'action (modifier, supprimer, réalisé) sont à droite du tableau ; "
-                "replier le panneau Contexte libère de la place.")
+shot("MODULE 3 · PILOTE", "Marquer l'action comme réalisée", "Fenêtre de réalisation", "pilote_08_action_realisee_modal",
+     [("Fenêtre de réalisation", "Rappelle l'action concernée."), ("Commentaire de réalisation", "Résultat obtenu (recommandé)."),
+      ("Confirmer", "L'action passe à « terminé ».")],
+     tip="Seules les actions « terminées » permettent de soumettre.", note="Cliquer sur la coche verte de la ligne de l'action.")
 
-_n8,_a,_b=mock_modal("pilote_08_action_realisee_modal","Marquer comme réalisé",[("ACTION","Demande de paiement de l'émission…",0),("COMMENTAIRE DE RÉALISATION","Paiement effectué, assuré informé",0)],"Confirmer la réalisation",(5,150,105))
-shot_slide("Marquer l'action comme réalisée", "MODULE 3 · PILOTE", _n8,
-           [("Fenêtre de réalisation", "Rappelle l'action concernée."),
-            ("Commentaire de réalisation", "Résultat obtenu (facultatif mais recommandé)."),
-            ("Confirmer la réalisation", "L'action passe à « terminé ».")],
-           marks=[(1, 440, 241), (2, 440, 336), (3, 650, 425)],
-           tip="Seules les actions « terminées » permettent de soumettre le dossier.",
-           note="(Fenêtre reconstituée à partir des libellés réels de l'application.) Cliquer sur la coche verte de la ligne de l'action.")
+shot("MODULE 3 · PILOTE", "Soumettre à validation", "Conditions réunies", "pilote_09_pret_soumettre",
+     [("Soumettre à validation", "Le bouton apparaît quand les conditions sont réunies."), ("Escalader", "Reste disponible."),
+      ("Analyse enregistrée", "Catégorie, cause et commentaire."), ("Action terminée", "Avec son commentaire de réalisation.")],
+     marks=[(235, 117, 384, 146), (390, 117, 528, 146), (219, 235, 570, 522), (586, 235, 937, 503)],
+     tip="Après soumission, le dossier passe « À clôturer ».", note="Les avertissements ont disparu. Un clic suffit pour soumettre.")
 
-shot_slide("Soumettre à validation", "MODULE 3 · PILOTE", "pilote_09_pret_soumettre",
-           [("Soumettre à validation", "Le bouton apparaît quand les conditions sont réunies."),
-            ("Action terminée", "Le commentaire de réalisation est conservé.")],
-           marks=[(1, 395, 168), (2, 1000, 531)],
-           tip="Après soumission, le dossier passe « À clôturer » et attend le manager.",
-           note="Les avertissements ont disparu : analyse enregistrée et action réalisée. Un clic suffit pour soumettre.")
+shot("MODULE 3 · PILOTE", "Soumission confirmée", "Historique du dossier", "pilote_11_historique",
+     [("Statut « À clôturer »", "Le dossier attend la décision du manager."), ("Journal du dossier", "Qualification, prise en charge, action, soumission : tout est tracé.")],
+     tip="Le journal permet de reconstituer l'historique complet.", note="Message affiché à la soumission : « Dossier soumis à la validation ».")
 
-shot_slide("Soumission confirmée et historique", "MODULE 3 · PILOTE", "pilote_11_historique",
-           [("Statut « À clôturer »", "Le dossier attend la décision du manager."),
-            ("Journal du dossier", "Qualification, prise en charge, action ajoutée, soumission à validation : tout est tracé.")],
-           marks=[(1, 1226, 94), (2, 712, 496)],
-           tip="Le journal permet à chacun de reconstituer l'historique complet du dossier.",
-           note="Message affiché à la soumission : « Dossier soumis à la validation ».")
+s = content("MODULE 3 · PILOTE", "Escalade et bonnes pratiques", "Pour aller plus loin", "L'escalade n'a pas été déclenchée dans le cas fil rouge : présenter le principe oralement.")
+card(s, 0.5, 1.3, 6.0, 5.4, "Quand escalader ?", ["•  Le dossier relève d'une autre structure ou agence", "•  Une décision ou une information extérieure est nécessaire", "",
+                                                  "Comment ?", "•  Bouton « Escalader le dossier » en haut de la fiche", "•  Suivi dans « Escaladées » et « Suivi escalades »"], bs=14, color=ORANGE)
+card(s, 6.85, 1.3, 6.0, 5.4, "Bonnes pratiques du pilote", ["•  Prendre en charge rapidement : le délai court dès la déclaration", "•  Une analyse claire avant les actions", "•  Une action = un résultat vérifiable",
+                                                            "•  Renseigner le commentaire de réalisation", "•  Consulter « À corriger » chaque jour"], bs=14, color=BLUE)
 
-s = base("Cas particulier : l'escalade", "MODULE 3 · PILOTE")
-card(s, 0.45, 1.3, 6.1, 5.4, "Quand escalader ?",
-     ["•  Le dossier relève d'une autre structure ou d'une autre agence",
-      "•  Une décision ou une information extérieure est nécessaire pour avancer",
-      "",
-      "Comment ?",
-      "•  Bouton « Escalader le dossier » en haut de la fiche",
-      "•  Le dossier est suivi ensuite dans la corbeille « Escaladées » et le compteur « Suivi escalades »"], bs=15, color=ORANGE)
-card(s, 6.85, 1.3, 6.0, 5.4, "Bonnes pratiques du pilote",
-     ["•  Prendre en charge rapidement : le délai (SLA) court dès la déclaration",
-      "•  Une analyse claire avant les actions",
-      "•  Une action = un résultat vérifiable",
-      "•  Renseigner le commentaire de réalisation",
-      "•  Consulter « À corriger » chaque jour : ce sont les dossiers retournés par le manager"], bs=15, color=BLUE)
-notes(s, "L'escalade n'a pas été déclenchée dans le cas fil rouge : présenter le principe oralement. Insister sur le suivi des dossiers escaladés.")
+# ======================== Module 4
+section("4", "Manager de service / section", "Examiner le traitement, clôturer ou retourner", "Le manager est garant de la qualité : il valide ou renvoie les dossiers soumis par les pilotes.")
 
-# ===== MODULE 4 : MANAGER =====
-divider("4", "Manager de service / section accueil réclamations", "Examiner le traitement, clôturer ou retourner", "MODULE 4  ·  PROFIL MANAGER  (compte de test : CLARISSE KOUADIO — Agence Digitale)",
-        "Le manager est le garant de la qualité : il valide ou renvoie les dossiers soumis par les pilotes.")
+shot("MODULE 4 · MANAGER", "Le tableau de bord du manager", "Dossiers à valider", "manager_02_dashboard_a_valider",
+     [("Bandeau", "Indique les dossiers qui attendent votre validation."), ("Compteur « à valider »", "Dossiers soumis par les pilotes."),
+      ("Statut « À clôturer »", "Mis en évidence dans la liste.")],
+     marks=[(218, 62, 977, 160)], tip="Le raccourci « Clôturer » ne remplace pas l'examen du dossier.", note="La corbeille « À clôturer » est la priorité quotidienne du manager.")
 
-shot_slide("Le tableau de bord du manager", "MODULE 4 · MANAGER", "manager_02_dashboard_a_valider",
-           [("Bandeau", "« 1 dossier attend votre validation »."),
-            ("Compteur « à valider »", "Nombre de dossiers soumis par les pilotes."),
-            ("Dossier à clôturer", "Statut « À clôturer » mis en évidence."),
-            ("Clôturer", "Raccourci pour valider depuis la liste.")],
-           marks=[(1, 480, 144), (2, 979, 136), (3, 1056, 566), (4, 1187, 582)],
-           tip="Le raccourci « Clôturer » ne remplace pas l'examen du dossier.",
-           note="La corbeille « À clôturer » est la priorité quotidienne du manager.")
+shot("MODULE 4 · MANAGER", "Examiner le dossier soumis", "Fiche en attente de validation", "manager_03_fiche_validation",
+     [("Bandeau de validation", "Examiner l'analyse et les actions réalisées."), ("Clôturer", "Valide le traitement : le dossier passe « Résolu »."),
+      ("Retourner", "Renvoie le dossier au pilote pour complément."), ("Onglets", "Contrôler Traitement et Historique avant de décider.")],
+     marks=[(235, 118, 960, 150), (235, 160, 310, 187), (323, 160, 415, 187), (225, 238, 700, 262)],
+     tip="Vérifier : analyse cohérente, action réalisée, réponse adaptée.", note="Le manager n'agit que sur les dossiers de son agence.")
 
-shot_slide("Examiner le dossier soumis", "MODULE 4 · MANAGER", "manager_03_fiche_validation",
-           [("Bandeau de validation", "« Dossier en attente de validation. Veuillez examiner l'analyse et les actions réalisées. »"),
-            ("Clôturer", "Valide le traitement : le dossier passe « Résolu »."),
-            ("Retourner", "Renvoie le dossier au pilote pour complément."),
-            ("Onglets", "Contrôler Vue d'ensemble, Traitement et Historique avant de décider.")],
-           marks=[(1, 760, 170), (2, 331, 221), (3, 475, 221), (4, 568, 307)],
-           tip="Vérifier : analyse cohérente, action réalisée, réponse adaptée à la demande.",
-           note="Le manager n'agit que sur les dossiers de son agence.")
+shot("MODULE 4 · MANAGER", "Contrôler l'analyse et les actions", "Onglet Traitement", "manager_04_traitement",
+     [("Analyse du pilote", "Catégorie, cause et commentaire."), ("Liste des corrections", "Action terminée avec son commentaire de réalisation."),
+      ("Observations du Manager", "Zone d'observations en bas de page.")],
+     tip="En cas de doute, ouvrez l'Historique avant de clôturer.", note="Le manager retrouve ce que le pilote a saisi.")
 
-shot_slide("Contrôler l'analyse et les actions", "MODULE 4 · MANAGER", "manager_04_traitement",
-           [("Analyse du pilote", "Catégorie, cause et commentaire."),
-            ("Liste des corrections", "Action terminée avec son commentaire de réalisation."),
-            ("Observations du Manager", "Zone d'observations du manager.")],
-           numbered=False, tip="En cas de doute, ouvrez l'Historique avant de clôturer.",
-           note="Le manager retrouve exactement ce que le pilote a saisi.")
+shot("MODULE 4 · MANAGER", "Clôturer le dossier", "Fenêtre de clôture", "manager_05_cloture_modal",
+     [("Boutons Clôturer / Retourner", "En haut de la fiche."), ("Commentaire / justification", "Obligatoire : motive la décision."),
+      ("Valider et Clôturer", "Le dossier passe « Résolu ».")],
+     marks=[(235, 159, 415, 187), (315, 280, 684, 356), (554, 378, 684, 408)],
+     tip="Le commentaire de clôture est conservé dans l'historique.", note="Rédiger un commentaire utile : il sera relu en cas de contrôle.")
 
-_n5,_a,_b=mock_modal("manager_05_cloture_modal","Clôturer le dossier",[("COMMENTAIRE / JUSTIFICATION *","Traitement conforme, dossier clôturé",0)],"Valider et Clôturer",(5,150,105))
-shot_slide("Clôturer le dossier", "MODULE 4 · MANAGER", _n5,
-           [("Commentaire / justification", "Obligatoire : motive la décision."),
-            ("Valider et Clôturer", "Le dossier passe « Résolu » ; la réponse est disponible pour l'assuré.")],
-           marks=[(1, 440, 241), (2, 650, 330)],
-           tip="Le commentaire de clôture est conservé dans l'historique.",
-           note="Rédiger un commentaire utile : il sera relu en cas de contrôle.")
+s = content("MODULE 4 · MANAGER", "Retourner un dossier au pilote", "Cas du retour", "Le retour n'est pas dans le déroulé du dossier REC-2026-000010. Proposer en exercice de créer un second dossier et de le retourner.")
+card(s, 0.5, 1.3, 6.0, 5.4, "Quand retourner ?", ["•  Analyse insuffisante ou incohérente", "•  Action non réalisée ou non conforme", "•  Réponse inadaptée à la demande", "",
+                                                  "Comment ?", "•  Bouton rouge « Retourner »", "•  Indiquer le motif du retour", "•  Le dossier repasse « En cours »"], bs=14, color=RED)
+card(s, 6.85, 1.3, 6.0, 5.4, "Côté pilote", ["•  Le dossier apparaît dans « À corriger »", "•  Le pilote lit le motif dans l'historique", "•  Il complète l'analyse ou les actions", "•  Il soumet de nouveau", "",
+                                             "Cas non joué sur le dossier fil rouge : à faire en exercice (module 5)."], bs=14, color=BLUE)
 
-s = base("Retourner un dossier au pilote", "MODULE 4 · MANAGER")
-card(s, 0.45, 1.3, 6.1, 5.4, "Quand retourner ?",
-     ["•  Analyse insuffisante ou incohérente",
-      "•  Action non réalisée ou non conforme",
-      "•  Réponse qui ne répond pas à la demande",
-      "",
-      "Comment ?",
-      "•  Bouton rouge « Retourner » sur la fiche",
-      "•  Indiquer le motif du retour (obligatoire)",
-      "•  Le dossier repasse « En cours » chez le pilote"], bs=15, color=RED)
-card(s, 6.85, 1.3, 6.0, 5.4, "Côté pilote",
-     ["•  Le dossier apparaît dans « À corriger »",
-      "•  Le pilote lit le motif du retour dans l'historique",
-      "•  Il complète l'analyse ou les actions",
-      "•  Il soumet de nouveau à validation",
-      "",
-      "Ce cas n'a pas été joué dans le dossier fil rouge : à faire en exercice (module 5)."], bs=15, color=BLUE)
-notes(s, "Le retour n'est pas dans le déroulé du dossier REC-2026-000009 (clôturé du premier coup). Proposer en exercice de créer un second dossier et de le retourner.")
+shot("MODULE 4 · MANAGER", "Dossier résolu", "Fin du traitement", "manager_06_resolu",
+     [("Statut « Résolu »", "Fin du traitement."), ("Documents", "« Accusé » et « Réponse » (lettre) disponibles."), ("Dernières actions", "Clôture avec le commentaire du manager.")],
+     tip="La lettre de réponse peut être remise ou transmise à l'assuré.", note="Le dossier est clôturé ; l'assuré voit « Traitée / Résolue » sur le portail.")
 
-shot_slide("Dossier résolu", "MODULE 4 · MANAGER", "manager_06_resolu",
-           [("Statut « Résolu »", "Fin du traitement."),
-            ("Documents", "« Accusé » et « Réponse » (lettre) sont désormais disponibles."),
-            ("Dernières actions", "Clôture avec le commentaire du manager.")],
-           marks=[(1, 1221, 94), (2, 1144, 158), (3, 1056, 520)],
-           tip="La lettre de réponse peut être remise ou transmise à l'assuré.",
-           note="Le dossier est clôturé ; l'assuré voit « Traitée / Résolue » sur le portail.")
+shot("MODULE 4 · MANAGER", "Historique complet du dossier", "Qui, quoi, quand", "manager_07_historique",
+     [("Cinq événements", "Qualification, prise en charge, action ajoutée, soumission, validation."), ("Traçabilité", "Chaque étape est attribuée à son auteur.")],
+     tip="L'historique est la mémoire du dossier.", note="Cette frise résume le travail des trois profils sur un même dossier.")
 
-shot_slide("Historique complet du dossier", "MODULE 4 · MANAGER", "manager_07_historique",
-           [("Cinq événements", "Qualification (agent), prise en charge, action ajoutée, soumission (pilote), validation (manager)."),
-            ("Traçabilité", "Qui, quoi, quand : chaque étape est attribuée à son auteur.")],
-           numbered=False, tip="L'historique est la mémoire du dossier : consultez-le avant toute décision.",
-           note="Cette frise résume le travail des trois profils sur un même dossier.")
+# ======================== Module 5
+section("5", "Cas pratique complet", "Un dossier suivi de bout en bout : REC-2026-000010", "Récapitulatif du cas puis exercices en groupes (un assuré, un agent, un pilote, un manager).")
 
-# ===== MODULE 5 : CAS PRATIQUE =====
-divider("5", "Cas pratique complet", "Un dossier suivi de bout en bout : REC-2026-000009", "MODULE 5  ·  WORKFLOW INTÉGRAL",
-        "Récapitulatif du cas puis exercices en binôme ou trinôme (un assuré, un agent, un pilote, un manager).")
-
-s = base("Le dossier REC-2026-000009 : le parcours complet", "MODULE 5 · CAS PRATIQUE")
-rows = [("1", "Assuré", "Déclare sur le portail : allocations familiales non reçues", "Statut « Nouveau » — processus NQ", GREEN),
-        ("2", "Agent", "Qualifie : processus GDPF, motif et précision confirmés", "Toujours « Nouveau », qualifié", ORANGE),
-        ("3", "Pilote", "Prend en charge le dossier", "« En cours »", BLUE),
-        ("4", "Pilote", "Analyse (Cause CNPS — Emission non payée), ajoute et réalise une action", "Action « terminée »", BLUE),
-        ("5", "Pilote", "Soumet à validation", "« À clôturer »", BLUE),
-        ("6", "Manager", "Examine et clôture avec commentaire", "« Résolu »", NAVY),
+s = content("MODULE 5 · CAS PRATIQUE", "Le parcours du dossier REC-2026-000010", "Sept étapes, quatre acteurs", "Reprendre chaque ligne en pointant la capture correspondante.")
+rows = [("1", "Assuré", "Déclare sur le portail : allocations familiales non reçues", "« Nouveau » — processus NQ", GREEN), ("2", "Agent", "Qualifie : processus GDPF, motif et précision confirmés", "Qualifié", ORANGE),
+        ("3", "Pilote", "Prend en charge le dossier", "« En cours »", BLUE), ("4", "Pilote", "Analyse (Cause CNPS — Emission non payée), ajoute et réalise une action", "Action « terminée »", BLUE),
+        ("5", "Pilote", "Soumet à validation", "« À clôturer »", BLUE), ("6", "Manager", "Examine et clôture avec commentaire", "« Résolu »", RGBColor(0x0F, 0x24, 0x4D)),
         ("7", "Assuré", "Consulte le suivi : « Traitée / Résolue », lettre de réponse disponible", "Terminée", GREEN)]
 for i, (n, who, what, st, c) in enumerate(rows):
-    y = 1.25 + i * 0.8
-    rect(s, 0.45, y, 12.4, 0.72, WHITE if i % 2 else LIGHT, RGBColor(0xC8, 0xD0, 0xDC))
-    o = rect(s, 0.6, y + 0.12, 0.46, 0.46, c, shape=MSO_SHAPE.OVAL)
-    tf = o.text_frame; tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0; tf.vertical_anchor = MSO_ANCHOR.MIDDLE
-    p = tf.paragraphs[0]; p.alignment = PP_ALIGN.CENTER; r_ = p.add_run(); r_.text = n; r_.font.size = Pt(16); r_.font.bold = True; r_.font.color.rgb = WHITE; r_.font.name = FONT
-    text(s, 1.2, y, 1.6, 0.72, who, size=16, bold=True, color=c, anchor=MSO_ANCHOR.MIDDLE)
-    text(s, 2.85, y, 6.6, 0.72, what, size=14, anchor=MSO_ANCHOR.MIDDLE)
-    text(s, 9.6, y, 3.2, 0.72, st, size=13, bold=True, color=GRAY, anchor=MSO_ANCHOR.MIDDLE)
-notes(s, "Reprendre chaque ligne en pointant la capture correspondante dans les modules précédents. Durée du parcours réel : environ vingt minutes entre la déclaration et la clôture.")
+    y = 1.25 + i * 0.78
+    rect(s, 0.5, y, 12.3, 0.7, WHITE if i % 2 else LIGHT, LINE)
+    badge(s, n, 0.85, y + 0.35, d=0.44, fill=c, size=14)
+    text(s, 1.2, y, 1.6, 0.7, who, size=14, bold=True, color=c, anchor=MSO_ANCHOR.MIDDLE)
+    text(s, 2.8, y, 6.7, 0.7, what, size=12, anchor=MSO_ANCHOR.MIDDLE)
+    text(s, 9.6, y, 3.2, 0.7, st, size=12, bold=True, color=GRAY, anchor=MSO_ANCHOR.MIDDLE)
 
-shot_slide("Retour côté assuré : dossier traité", "MODULE 5 · CAS PRATIQUE", "assure_07_suivi_final",
-           [("Statut actuel", "« Traitée / Résolue »."),
-            ("4 étapes complétées", "Réception, Traitement, Clôture, Terminée."),
-            ("Réclamation traitée", "Message : une solution a été apportée."),
-            ("Documents", "Accusé et Lettre de réponse à télécharger.")],
-           marks=[(1, 890, 700), (2, 640, 830), (3, 640, 1335), (4, 548, 1467)], crop=(230, 600, 1050, 1540),
-           tip="Boucle bouclée : l'assuré constate lui-même la résolution avec son numéro de ticket.",
-           note="Comparer avec la capture initiale (« Réceptionnée ») : mêmes informations, statut différent.")
+shot("MODULE 5 · CAS PRATIQUE", "Retour côté assuré : dossier traité", "Boucle bouclée", "assure_07_suivi_final",
+     [("Statut actuel", "« Traitée / Résolue »."), ("4 étapes complétées", "Réception, Traitement, Clôture, Terminée."), ("Réclamation traitée", "Une solution a été apportée.")],
+     marks=[(590, 48, 775, 104), (238, 165, 762, 265), (238, 543, 762, 620)],
+     tip="L'assuré constate lui-même la résolution avec son numéro de ticket.", note="Comparer avec la capture initiale « Réceptionnée ».")
 
-s = base("Exercices de mise en pratique", "MODULE 5 · CAS PRATIQUE")
-ex = [("A", "Assuré", "Déclarer une réclamation fictive (sujet au choix), noter le numéro, vérifier le suivi.", GREEN),
-      ("B", "Agent", "Retrouver le dossier dans « Non qualifiées » et le qualifier avec le bon processus.", ORANGE),
-      ("C", "Pilote", "Prendre en charge, renseigner l'analyse, ajouter et réaliser une action, soumettre.", BLUE),
-      ("D", "Manager", "Examiner puis clôturer — ou retourner avec un motif précis.", NAVY),
-      ("E", "Tous", "Rejouer un dossier avec retour : le manager retourne, le pilote corrige et resoumet.", RED)]
+s = content("MODULE 5 · CAS PRATIQUE", "Exercices de mise en pratique", "En groupes de quatre", "Utiliser exclusivement la plateforme de test et des données fictives.")
+ex = [("A", "Assuré", "Déclarer une réclamation fictive, noter le numéro, vérifier le suivi.", GREEN), ("B", "Agent", "Retrouver le dossier dans « Non qualifiées » et le qualifier.", ORANGE),
+      ("C", "Pilote", "Prendre en charge, analyser, ajouter et réaliser une action, soumettre.", BLUE), ("D", "Manager", "Examiner puis clôturer — ou retourner avec un motif.", RGBColor(0x0F, 0x24, 0x4D)),
+      ("E", "Tous", "Rejouer un dossier avec retour : retour, correction, nouvelle soumission.", RED)]
 for i, (l, who, d, c) in enumerate(ex):
-    y = 1.3 + i * 1.1
-    rect(s, 0.45, y, 12.4, 0.95, WHITE, RGBColor(0xC8, 0xD0, 0xDC), MSO_SHAPE.ROUNDED_RECTANGLE).adjustments[0] = 0.12
-    o = rect(s, 0.65, y + 0.17, 0.62, 0.62, c, shape=MSO_SHAPE.OVAL)
-    tf = o.text_frame; tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0; tf.vertical_anchor = MSO_ANCHOR.MIDDLE
-    p = tf.paragraphs[0]; p.alignment = PP_ALIGN.CENTER; r_ = p.add_run(); r_.text = l; r_.font.size = Pt(22); r_.font.bold = True; r_.font.color.rgb = WHITE; r_.font.name = FONT
-    text(s, 1.5, y, 2.0, 0.95, who, size=20, bold=True, color=c, anchor=MSO_ANCHOR.MIDDLE)
-    text(s, 3.5, y, 9.2, 0.95, d, size=16, anchor=MSO_ANCHOR.MIDDLE)
-notes(s, "Former des groupes de quatre. Chaque groupe enchaîne A, B, C, D puis E. Utiliser exclusivement la plateforme de test et des données fictives.")
+    y = 1.3 + i * 1.08
+    r = rect(s, 0.5, y, 12.3, 0.95, WHITE, LINE, MSO_SHAPE.ROUNDED_RECTANGLE); r.adjustments[0] = 0.12
+    badge(s, l, 1.0, y + 0.47, d=0.6, fill=c, size=20)
+    text(s, 1.5, y, 2.0, 0.95, who, size=17, bold=True, color=c, anchor=MSO_ANCHOR.MIDDLE)
+    text(s, 3.5, y, 9.2, 0.95, d, size=14, anchor=MSO_ANCHOR.MIDDLE)
 
-s = base("Questions de contrôle", "MODULE 5 · CAS PRATIQUE")
-qs = ["Que doit conserver l'assuré après avoir déclaré une réclamation ?",
-      "Pourquoi un dossier du portail est-il « Non qualifié » ? Qui le qualifie ?",
-      "Quelles sont les deux conditions pour qu'un pilote puisse soumettre un dossier ?",
-      "Quelle différence entre « Clôturer » et « Retourner » ?",
-      "Où l'assuré voit-il que son dossier est résolu ?",
-      "Où retrouver qui a fait quoi et quand sur un dossier ?"]
+s = content("MODULE 5 · CAS PRATIQUE", "Questions de contrôle", "Vérifier les acquis",
+            "Réponses : 1) le numéro de ticket ; 2) il vient du portail avec le processus de repli NQ, l'Agence Digitale le qualifie ; 3) analyse enregistrée et au moins une action réalisée ; "
+            "4) clôturer valide, retourner renvoie au pilote ; 5) sur /suivi avec le numéro ; 6) onglet Historique.")
+qs = ["Que doit conserver l'assuré après avoir déclaré une réclamation ?", "Pourquoi un dossier du portail est-il « Non qualifié » ? Qui le qualifie ?",
+      "Quelles sont les deux conditions pour qu'un pilote puisse soumettre ?", "Quelle différence entre « Clôturer » et « Retourner » ?",
+      "Où l'assuré voit-il que son dossier est résolu ?", "Où retrouver qui a fait quoi et quand ?"]
 for i, q in enumerate(qs):
     y = 1.3 + i * 0.9
-    rect(s, 0.45, y, 0.7, 0.7, ORANGE, shape=MSO_SHAPE.OVAL)
-    text(s, 0.45, y, 0.7, 0.7, str(i + 1), size=22, bold=True, color=WHITE, align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
-    text(s, 1.4, y, 11.4, 0.7, q, size=18, anchor=MSO_ANCHOR.MIDDLE)
-notes(s, "Réponses : 1) le numéro de ticket ; 2) il vient du portail avec le processus de repli NQ, l'agent de l'Agence Digitale le qualifie ; "
-         "3) analyse enregistrée et au moins une action réalisée ; 4) clôturer valide (Résolu), retourner renvoie au pilote (En cours) ; "
-         "5) sur le portail de suivi (/suivi) avec le numéro ; 6) onglet Historique.")
+    badge(s, i + 1, 0.85, y + 0.35, d=0.6, size=18)
+    text(s, 1.35, y, 11.4, 0.7, q, size=16, anchor=MSO_ANCHOR.MIDDLE)
 
-# ===== ASSISTANCE =====
-s = base("Besoin d'aide ? Le catalogue GLPI", "ASSISTANCE")
-text(s, 0.45, 1.2, 12.4, 0.8, "Tout problème d'utilisation se signale par un ticket GLPI : famille « BESOIN APPLICATIF », sous-famille « GREL », sous-famille 2 « E-RECLAMATION ».",
-     size=16)
-card(s, 0.45, 2.1, 4.0, 4.6, "Coordonnateur qualité",
-     ["Questions fonctionnelles :", "•  Impossible de qualifier, soumettre ou valider", "•  Dossier invisible", "•  Délai SLA incorrect", "•  Paramétrage (motifs, délais, causes)", "•  Assistance ou formation"], color=BLUE, bs=13)
-card(s, 4.65, 2.1, 4.0, 4.6, "Technicien support SI",
-     ["Questions techniques :", "•  Création de compte, mot de passe", "•  Connexion impossible ou déconnexion immédiate", "•  Pièce jointe, PDF, export", "•  Notification non reçue", "•  Application lente ou indisponible"], color=ORANGE, bs=13)
-card(s, 8.85, 2.1, 4.0, 4.6, "Niveaux d'urgence",
-     [[("BLOQUANT ", {"bold": True, "color": RED}), ("— vous ne pouvez plus travailler", {})],
-      [("MAJORITAIRE ", {"bold": True, "color": ORANGE}), ("— gêne importante", {})],
-      [("MINEUR ", {"bold": True, "color": GREEN}), ("— demande non urgente", {})],
-      "",
-      "Indiquez toujours : le n° de ticket concerné, ce que vous faisiez et le message affiché (capture d'écran)."], color=NAVY, bs=13)
-notes(s, "Présenter le catalogue GLPI préparé pour e-Réclamations (31 catégories, deux groupes responsables, trois niveaux d'urgence). "
-         "Rappeler l'intérêt de joindre une capture d'écran.")
+s = content("ASSISTANCE", "Besoin d'aide ? Le catalogue GLPI", "BESOIN APPLICATIF › GREL › E-RECLAMATION", "Catalogue GLPI préparé pour e-Réclamations : deux groupes responsables, trois niveaux d'urgence.")
+text(s, 0.5, 1.2, 12.3, 0.8, "Tout problème d'utilisation se signale par un ticket GLPI : famille « BESOIN APPLICATIF », sous-famille « GREL », sous-famille 2 « E-RECLAMATION ».", size=14, color=GRAY)
+card(s, 0.5, 2.1, 4.0, 4.6, "Coordonnateur qualité", ["Questions fonctionnelles :", "•  Impossible de qualifier, soumettre ou valider", "•  Dossier invisible", "•  Délai SLA incorrect", "•  Paramétrage (motifs, délais, causes)", "•  Assistance ou formation"], color=BLUE, bs=12)
+card(s, 4.7, 2.1, 4.0, 4.6, "Technicien support SI", ["Questions techniques :", "•  Création de compte, mot de passe", "•  Connexion impossible", "•  Pièce jointe, PDF, export", "•  Notification non reçue", "•  Application lente ou indisponible"], color=ORANGE, bs=12)
+card(s, 8.9, 2.1, 3.9, 4.6, "Niveaux d'urgence", [[("BLOQUANT ", {"bold": True, "color": RED}), ("— vous ne pouvez plus travailler", {})],
+                                                    [("MAJORITAIRE ", {"bold": True, "color": ORANGE}), ("— gêne importante", {})], [("MINEUR ", {"bold": True, "color": GREEN}), ("— demande non urgente", {})], "",
+                                                    "Indiquez le n° de ticket, ce que vous faisiez et le message affiché (capture d'écran)."], color=RGBColor(0x0F, 0x24, 0x4D), bs=12)
 
-s = base("Points clés à retenir")
-keys = [("Le numéro de ticket", "est la clé du dossier, pour l'assuré comme pour le personnel.", GREEN),
-        ("Agent", "saisit au guichet et qualifie les dossiers du portail (processus NQ → processus réel).", ORANGE),
-        ("Pilote", "prend en charge, analyse, agit, puis soumet : l'analyse et une action réalisée sont obligatoires.", BLUE),
-        ("Manager", "examine puis clôture ou retourne avec un motif.", NAVY),
-        ("L'historique", "trace chaque étape : qui, quoi, quand.", GRAY),
-        ("En cas de souci", "ticket GLPI GREL / E-RECLAMATION avec capture d'écran.", RED)]
+s = content("CONCLUSION", "Points clés à retenir", "L'essentiel en six messages", "Conclure en reprenant le fil rouge. Inviter à refaire les exercices sur la plateforme de test.")
+keys = [("Le numéro de ticket", "est la clé du dossier, pour l'assuré comme pour le personnel.", GREEN), ("Agent", "saisit au guichet et qualifie les dossiers du portail (NQ → processus réel).", ORANGE),
+        ("Pilote", "prend en charge, analyse, agit puis soumet : analyse et action réalisée obligatoires.", BLUE), ("Manager", "examine puis clôture ou retourne avec un motif.", RGBColor(0x0F, 0x24, 0x4D)),
+        ("L'historique", "trace chaque étape : qui, quoi, quand.", GRAY), ("En cas de souci", "ticket GLPI GREL / E-RECLAMATION avec capture d'écran.", RED)]
 for i, (h, d, c) in enumerate(keys):
-    x = 0.45 + (i % 3) * 4.2; y = 1.4 + (i // 3) * 2.8
-    rect(s, x, y, 4.0, 2.5, WHITE, RGBColor(0xC8, 0xD0, 0xDC), MSO_SHAPE.ROUNDED_RECTANGLE).adjustments[0] = 0.06
-    rect(s, x, y, 0.14, 2.5, c)
-    text(s, x + 0.3, y + 0.2, 3.6, 0.6, h, size=20, bold=True, color=c)
-    text(s, x + 0.3, y + 0.9, 3.6, 1.5, d, size=15)
-notes(s, "Conclure en reprenant le fil rouge. Inviter les participants à poser leurs questions et à refaire les exercices sur la plateforme de test.")
+    card(s, 0.5 + (i % 3) * 4.2, 1.3 + (i // 3) * 2.8, 4.0, 2.55, h, d, color=c, hs=17, bs=13)
 
+# ======================== Merci (modele)
 counter["n"] += 1
-s = prs.slides.add_slide(BLANK)
-rect(s, 0, 0, 13.333, 7.5, NAVY); rect(s, 0, 4.4, 13.333, 0.07, ORANGE)
-text(s, 0.8, 2.0, 11.7, 1.4, "Merci !", size=66, bold=True, color=WHITE)
-text(s, 0.8, 3.4, 11.7, 0.9, "Questions et échanges", size=26, color=RGBColor(0xC8, 0xD6, 0xEA))
-text(s, 0.8, 4.8, 11.7, 1.2, ["Plateforme de test : e-reclamation-test.cnps.ci", "Assistance : GLPI — GREL / E-RECLAMATION"], size=18, color=WHITE)
-notes(s, "Fin de la session.")
+s = prs.slides.add_slide(LAY[4])
+settext(ph(s, 10), "Siège, Abidjan (Plateau)\nNuméro direct : 1396"); settext(ph(s, 11), "Site internet\nhttps://www.cnps.ci")
+settext(ph(s, 12), "Informations\nrelationclients@cnps.ci"); settext(ph(s, 13), "WhatsApp\n05 54 57 57 57")
+clean(s); notes(s, "Fin de la session. Assistance : GLPI — GREL / E-RECLAMATION. Plateforme de test : e-reclamation-test.cnps.ci")
 
 prs.save(OUT)
-print("OK:", OUT, "-", len(prs.slides), "diapositives")
+print("OK", OUT, len(prs.slides))
